@@ -2,6 +2,8 @@ package com.github.mimo31.gravitysimulator;
 
 /**
  * Created by Viktor on 3/11/2016.
+ *
+ * Class for representing a 2D Vector.
  */
 public class Vector2d {
 

@@ -22,9 +22,9 @@ import java.util.List;
  */
 public class GravityView extends View implements DialogInterface.OnClickListener{
 
-    private MainActivity attachedTo;
-    private List<GravitationalObject> objects = new ArrayList<>();
-    private GestureDetectorCompat gestureDetector;
+    private final MainActivity attachedTo;
+    private final List<GravitationalObject> objects = new ArrayList<>();
+    private final GestureDetectorCompat gestureDetector;
     private boolean isAddingObjectValid;
     private boolean positionConfirmed;
     private float confirmHidingState;
@@ -181,7 +181,7 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         return true;
     }
 
-    protected void validateAddingObject() {
+    void validateAddingObject() {
         this.isAddingObjectValid = true;
         for (int i = 0; i < this.objects.size(); i++) {
             if (this.attachedTo.addingObject.doesCollide(this.objects.get(i))) {
@@ -190,7 +190,7 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         }
     }
 
-    protected void update() {
+    void update() {
         boolean doInvalidate = false;
         if (this.confirmHidingState != 0) {
             this.confirmHidingState -= 0.08;
@@ -273,13 +273,13 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         dialog.cancel();
     }
 
-    protected void clearAllObjects() {
+    void clearAllObjects() {
         this.objects.clear();
     }
 
     private static class GestureListener extends GestureDetector.SimpleOnGestureListener {
 
-        private GravityView attachedTo;
+        private final GravityView attachedTo;
 
         public GestureListener(GravityView attachedTo) {
             this.attachedTo = attachedTo;

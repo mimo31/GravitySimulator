@@ -13,7 +13,7 @@ import android.graphics.Rect;
 public class GravitationalObject {
 
     final int radius;
-    final int density;
+    final private int density;
     Vector2d position;
     Vector2d velocity;
 

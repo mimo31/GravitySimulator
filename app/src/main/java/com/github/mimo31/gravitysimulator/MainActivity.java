@@ -30,7 +30,7 @@ public class MainActivity extends Activity implements Runnable {
     private boolean resuming;
     private float pausingState;
     public boolean paused;
-    private Handler updateHandler = new Handler();
+    private final Handler updateHandler = new Handler();
     private final int updateDelay = 17;
     public GravitationalObject addingObject;
     private boolean animatingHelp = false;
@@ -226,7 +226,7 @@ public class MainActivity extends Activity implements Runnable {
         return Math.min(this.getWidth(), this.getHeight()) / 2;
     }
 
-    protected void pause() {
+    void pause() {
         this.paused = true;
         this.pausing = true;
         if (this.attachedPauseView == null) {
@@ -254,14 +254,14 @@ public class MainActivity extends Activity implements Runnable {
         return this.getWindow().findViewById(Window.ID_ANDROID_CONTENT).getHeight();
     }
 
-    protected void cancelAdditionFromGravityView() {
+    void cancelAdditionFromGravityView() {
         this.pausing = true;
     }
 
     private static class PauseMenuView extends View {
 
-        private MainActivity attachedTo;
-        private GestureDetectorCompat gestureDetector;
+        private final MainActivity attachedTo;
+        private final GestureDetectorCompat gestureDetector;
 
         public PauseMenuView(MainActivity attachedTo) {
             super(attachedTo.getApplicationContext());
@@ -303,7 +303,7 @@ public class MainActivity extends Activity implements Runnable {
 
         private static class GestureListener extends GestureDetector.SimpleOnGestureListener implements DialogInterface.OnClickListener {
 
-            private PauseMenuView attachedTo;
+            private final PauseMenuView attachedTo;
 
             public GestureListener(PauseMenuView attachedTo) {
                 this.attachedTo = attachedTo;

@@ -6,6 +6,8 @@ import android.graphics.Rect;
 
 /**
  * Created by Viktor on 3/11/2016.
+ *
+ * Class for drawing strings into rectangular bounds.
  */
 public class StringDraw {
 
