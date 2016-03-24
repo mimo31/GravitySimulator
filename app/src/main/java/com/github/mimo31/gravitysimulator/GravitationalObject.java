@@ -7,6 +7,8 @@ import android.graphics.Rect;
 
 /**
  * Created by Viktor on 3/11/2016.
+ *
+ * Class for representing one Object in the simulation of gravity.
  */
 public class GravitationalObject {
 
@@ -39,12 +41,7 @@ public class GravitationalObject {
 
     public Vector2d getGravitationalForce(GravitationalObject object) {
         Vector2d distanceVector = new Vector2d(object.position.x - this.position.x, object.position.y - this.position.y);
-        Vector2d forceVector = distanceVector.multiply(this.getMass() * (double) object.getMass() / Math.pow(distanceVector.getLength(), 3));
-        return forceVector;
-    }
-
-    public double getKineticEnergy() {
-        return this.velocity.dot(this.velocity) * this.getMass() / 2;
+        return distanceVector.multiply(this.getMass() * object.getMass() / Math.pow(distanceVector.getLength(), 3));
     }
 
     public void drawInfo(Canvas canvas, float state) {
@@ -87,7 +84,7 @@ public class GravitationalObject {
         return new Rect(startX + tableX * canvas.getWidth() / 2, canvas.getHeight() / 2 + tableY * canvas.getHeight() / 12, startX + + (1 + tableX) * canvas.getWidth() / 2, canvas.getHeight() / 2 + (tableY + 1) * canvas.getHeight() / 12);
     }
 
-    public int getMass() {
-        return (int) (this.density * Math.pow(this.radius, 2));
+    public double getMass() {
+        return this.density * Math.pow(this.radius, 2) / 64;
     }
 }

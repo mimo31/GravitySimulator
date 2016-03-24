@@ -29,18 +29,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceSmall"
-        android:text="To make a object that don&apos;t affect and isn&apos;t affected by other objects gravitationally set its density to 0."
-        android:id="@+id/textView5"
-        android:layout_below="@+id/textView6"
-        android:layout_alignLeft="@+id/textView6"
-        android:layout_alignStart="@+id/textView6"
-        android:layout_marginTop="10dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:text="Tap on a object to edit it."
+        android:text="Tap on an object to change its properties."
         android:id="@+id/textView6"
         android:layout_below="@+id/textView4"
         android:layout_alignLeft="@+id/textView4"
@@ -53,7 +42,7 @@
         android:text="Back"
         android:id="@+id/helpBackButton"
         android:layout_alignParentBottom="true"
-        android:layout_alignLeft="@+id/textView5"
-        android:layout_alignStart="@+id/textView5"
-        android:onClick="hideHelp" />
+        android:onClick="hideHelp"
+        android:layout_alignLeft="@+id/textView6"
+        android:layout_alignStart="@+id/textView6" />
 </RelativeLayout>

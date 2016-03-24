@@ -17,11 +17,13 @@ import java.util.List;
 
 /**
  * Created by Viktor on 3/20/2016.
+ *
+ * View for the main field where gravity is simulated.
  */
 public class GravityView extends View implements DialogInterface.OnClickListener{
 
     private MainActivity attachedTo;
-    private List<GravitationalObject> objects = new ArrayList<GravitationalObject>();
+    private List<GravitationalObject> objects = new ArrayList<>();
     private GestureDetectorCompat gestureDetector;
     private boolean isAddingObjectValid;
     private boolean positionConfirmed;
@@ -38,7 +40,7 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         this.gestureDetector = new GestureDetectorCompat(attachedTo.getApplicationContext(), new GestureListener(this));
     }
 
-    private void updateObjects() {
+    private void updateObjects(double deltaTime) {
         for (int i = 0; i < this.objects.size(); i++) {
             GravitationalObject currentObject = this.objects.get(i);
             if (currentObject.getMass() != 0) {
@@ -48,11 +50,10 @@ public class GravityView extends View implements DialogInterface.OnClickListener
                         totalForce = totalForce.add(currentObject.getGravitationalForce(this.objects.get(j)));
                     }
                 }
-                totalForce = totalForce.multiply(1 / (double) currentObject.getMass() / 4);
-                currentObject.velocity = currentObject.velocity.add(totalForce);
+                currentObject.velocity = currentObject.velocity.add(totalForce.multiply(deltaTime / currentObject.getMass()));
             }
-            currentObject.position.x += currentObject.velocity.x / 64;
-            currentObject.position.y += currentObject.velocity.y / 64;
+            currentObject.position.x += currentObject.velocity.x * deltaTime;
+            currentObject.position.y += currentObject.velocity.y * deltaTime;
             if (currentObject.position.x < currentObject.radius) {
                 currentObject.position.x = 2 * currentObject.radius - currentObject.position.x;
                 currentObject.velocity.x *= -1;
@@ -77,24 +78,16 @@ public class GravityView extends View implements DialogInterface.OnClickListener
                 if (o1.doesCollide(o2)) {
                     Vector2d distanceVector = o1.position.subtract(o2.position);
                     double collisionFactor = o1.velocity.subtract(o2.velocity).dot(distanceVector) / distanceVector.dot(distanceVector);
-                    o1.velocity = o1.velocity.subtract(distanceVector.multiply(2 * o2.getMass() / (double) (o1.getMass() + o2.getMass()) * collisionFactor));
-                    o2.velocity = o2.velocity.add(distanceVector.multiply(2 * o1.getMass() / (double) (o1.getMass() + o2.getMass()) * collisionFactor));
-                    Vector2d totalShift = distanceVector.multiply((o1.radius + o2.radius - distanceVector.getLength()) / distanceVector.getLength() * 2);
+                    Vector2d addVector = distanceVector.multiply(2 / (o1.getMass() + o2.getMass()) * collisionFactor);
+                    o1.velocity = o1.velocity.subtract(addVector.multiply(o2.getMass()));
+                    o2.velocity = o2.velocity.add(addVector.multiply(o1.getMass()));
+                    Vector2d totalShift = distanceVector.multiply((o1.radius + o2.radius) / distanceVector.getLength() * 2 - 2);
                     double o1VelocityFraction = o1.velocity.getLength() / (o1.velocity.getLength() + o2.velocity.getLength());
                     double o2VelocityFraction = 1 - o1VelocityFraction;
                     Vector2d o1Shift = totalShift.multiply(o1VelocityFraction);
                     Vector2d o2Shift = totalShift.multiply(-o2VelocityFraction);
-                    Vector2d oldO1Pos = o1.position;
-                    Vector2d oldO2Pos = o2.position;
                     o1.position = o1.position.add(o1Shift);
                     o2.position = o2.position.add(o2Shift);
-                    double totalEnergyGain = (1 / oldO1Pos.subtract(oldO2Pos).getLength() - 1 / o1.position.subtract(o2.position).getLength()) * o1.getMass() * o2.getMass();
-                    double energyForO1 = totalEnergyGain * o2.getMass() / (o1.getMass() + o2.getMass());
-                    double energyForO2 = totalEnergyGain * o1.getMass() / (o1.getMass() + o2.getMass());
-                    double newO1Energy = o1.getKineticEnergy() - energyForO1;
-                    double newO2Energy = o2.getKineticEnergy() - energyForO2;
-                    o1.velocity = o1.velocity.multiply(Math.sqrt(2 * newO1Energy / o1.getMass()) / o1.velocity.getLength());
-                    o2.velocity = o2.velocity.multiply(Math.sqrt(2 * newO2Energy / o2.getMass()) / o2.velocity.getLength());
                 }
             }
         }
@@ -163,7 +156,7 @@ public class GravityView extends View implements DialogInterface.OnClickListener
     private void drawVelocity(Canvas canvas, Paint p, GravitationalObject object) {
         if (object.velocity.x != 0 || object.velocity.y != 0) {
             canvas.save();
-            float totalSpeed = (float) object.velocity.getLength();
+            float totalSpeed = (float) object.velocity.getLength() * 32;
             canvas.translate((float) object.position.x, (float) object.position.y);
             canvas.rotate((float) (Math.atan2(object.velocity.y, object.velocity.x) / Math.PI * 180));
             canvas.scale(totalSpeed / 1000, totalSpeed / 1000);
@@ -207,7 +200,9 @@ public class GravityView extends View implements DialogInterface.OnClickListener
             doInvalidate = true;
         }
         if (!this.attachedTo.paused && !this.simulationPaused && !this.changingVelocity) {
-            this.updateObjects();
+            for (int i = 0; i < 256; i++) {
+                this.updateObjects(1 / (double) 256);
+            }
             doInvalidate = true;
         }
         if (this.objectInfoIndex != -1) {
@@ -327,8 +322,8 @@ public class GravityView extends View implements DialogInterface.OnClickListener
                             if (e.getY() > this.attachedTo.getHeight() / 16) {
                                 GravitationalObject addingObject = this.attachedTo.attachedTo.addingObject;
                                 if (this.attachedTo.positionConfirmed) {
-                                    addingObject.velocity.x = e.getX() - addingObject.position.x;
-                                    addingObject.velocity.y = e.getY() - addingObject.position.y;
+                                    addingObject.velocity.x = (e.getX() - addingObject.position.x) / 32;
+                                    addingObject.velocity.y = (e.getY() - addingObject.position.y) / 32;
                                 }
                                 else {
                                     addingObject.position.x = e.getX();
@@ -394,8 +389,8 @@ public class GravityView extends View implements DialogInterface.OnClickListener
             else {
                 if (e.getY() >= this.attachedTo.getHeight() / 16) {
                     GravitationalObject changingObject = this.attachedTo.lastObjectInfoShown;
-                    changingObject.velocity.x = e.getX() - changingObject.position.x;
-                    changingObject.velocity.y = e.getY() - changingObject.position.y;
+                    changingObject.velocity.x = (e.getX() - changingObject.position.x) / (double) 32;
+                    changingObject.velocity.y = (e.getY() - changingObject.position.y) / (double) 32;
                     this.attachedTo.postInvalidate();
                 }
             }
