@@ -107,7 +107,7 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         }
         if (this.attachedTo.addingObject == null && !this.changingVelocity) {
             p.setColor(Color.BLACK);
-            StringDraw.drawMaxString("Menu", menuButtonRect, canvas.getWidth() / 64, canvas, p);
+            StringDraw.drawMaxString("Menu", menuButtonRect, canvas.getHeight() / 128, canvas, p);
         }
         else if (this.attachedTo.addingObject != null) {
             this.attachedTo.addingObject.draw(canvas, this.isAddingObjectValid ? Color.GREEN : Color.RED);
@@ -200,8 +200,8 @@ public class GravityView extends View implements DialogInterface.OnClickListener
             doInvalidate = true;
         }
         if (!this.attachedTo.paused && !this.simulationPaused && !this.changingVelocity) {
-            for (int i = 0; i < 256; i++) {
-                this.updateObjects(1 / (double) 256);
+            for (int i = 0; i < 64; i++) {
+                this.updateObjects(1 / (double) 64);
             }
             doInvalidate = true;
         }
