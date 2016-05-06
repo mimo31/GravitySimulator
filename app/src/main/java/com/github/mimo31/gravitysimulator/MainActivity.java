@@ -2,6 +2,7 @@ package com.github.mimo31.gravitysimulator;
 
 import android.app.Activity;
 import android.content.DialogInterface;
+import android.content.pm.ActivityInfo;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -45,6 +46,14 @@ public class MainActivity extends Activity implements Runnable {
 
     public static float getMovableViewPosition(float state, float initialSpeed) {
         return (float) ((2 * initialSpeed - 2) * Math.pow(state, 3) + (3 - 3 * initialSpeed) * Math.pow(state, 2) + initialSpeed * state);
+    }
+
+    public void lockOrientation() {
+        this.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LOCKED);
+    }
+
+    public void unlockOrientation() {
+        this.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_USER);
     }
 
     @Override

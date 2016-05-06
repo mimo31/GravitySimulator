@@ -40,6 +40,9 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         this.gestureDetector = new GestureDetectorCompat(attachedTo.getApplicationContext(), new GestureListener(this));
     }
 
+    /*
+    * Moves the objects according to the laws of gravity.
+     */
     private void updateObjects(double deltaTime) {
         for (int i = 0; i < this.objects.size(); i++) {
             GravitationalObject currentObject = this.objects.get(i);
@@ -153,6 +156,9 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         }
     }
 
+    /*
+    * Draws an arrow from the center of the passed GravitationalObject pointing in the direction of the velocity of the object.
+     */
     private void drawVelocity(Canvas canvas, Paint p, GravitationalObject object) {
         if (object.velocity.x != 0 || object.velocity.y != 0) {
             canvas.save();
@@ -186,6 +192,7 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         for (int i = 0; i < this.objects.size(); i++) {
             if (this.attachedTo.addingObject.doesCollide(this.objects.get(i))) {
                 this.isAddingObjectValid = false;
+                break;
             }
         }
     }
@@ -269,12 +276,16 @@ public class GravityView extends View implements DialogInterface.OnClickListener
     public void onClick(DialogInterface dialog, int which) {
         int indexToRemove = this.objectInfoIndex;
         this.hideObjectInfo();
+        if (this.objects.size() == 0) {
+            this.attachedTo.unlockOrientation();
+        }
         this.objects.remove(indexToRemove);
         dialog.cancel();
     }
 
     void clearAllObjects() {
         this.objects.clear();
+        this.attachedTo.unlockOrientation();
     }
 
     private static class GestureListener extends GestureDetector.SimpleOnGestureListener {
@@ -302,6 +313,7 @@ public class GravityView extends View implements DialogInterface.OnClickListener
                             if (e.getX() >= this.attachedTo.getWidth() / 2) {
                                 if (this.attachedTo.positionConfirmed) {
                                     this.attachedTo.objects.add(this.attachedTo.attachedTo.addingObject);
+                                    this.attachedTo.attachedTo.lockOrientation();
                                     this.attachedTo.attachedTo.addingObject = null;
                                     this.attachedTo.confirmHidingState = 1;
                                     this.attachedTo.positionConfirmed = false;
