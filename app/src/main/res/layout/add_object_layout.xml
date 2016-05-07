@@ -28,7 +28,6 @@
         android:layout_alignParentStart="true"
         android:layout_alignRight="@+id/addConfirmButton"
         android:layout_alignEnd="@+id/addConfirmButton"
-        android:hint="max 5"
         android:layout_marginTop="10dp"
         android:inputType="number"/>
 

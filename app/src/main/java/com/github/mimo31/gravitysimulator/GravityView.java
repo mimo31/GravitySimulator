@@ -4,27 +4,24 @@ import android.content.DialogInterface;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.Rect;
 import android.support.v4.view.GestureDetectorCompat;
 import android.support.v7.app.AlertDialog;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
- * Created by Viktor on 3/20/2016.
+ * Created by mimo31 on 3/20/2016.
  *
  * View for the main field where gravity is simulated.
  */
 public class GravityView extends View implements DialogInterface.OnClickListener{
 
     private final MainActivity attachedTo;
-    private final List<GravitationalObject> objects = new ArrayList<>();
     private final GestureDetectorCompat gestureDetector;
+    private final ScaleGestureDetector scaleDetector;
     private boolean isAddingObjectValid;
     private boolean positionConfirmed;
     private float confirmHidingState;
@@ -33,67 +30,13 @@ public class GravityView extends View implements DialogInterface.OnClickListener
     private float objectInfoState;
     private GravitationalObject lastObjectInfoShown;
     private boolean changingVelocity;
+    private GravitySpace space = new GravitySpace();
 
     public GravityView(MainActivity attachedTo) {
         super(attachedTo.getApplicationContext());
         this.attachedTo = attachedTo;
         this.gestureDetector = new GestureDetectorCompat(attachedTo.getApplicationContext(), new GestureListener(this));
-    }
-
-    /*
-    * Moves the objects according to the laws of gravity.
-     */
-    private void updateObjects(double deltaTime) {
-        for (int i = 0; i < this.objects.size(); i++) {
-            GravitationalObject currentObject = this.objects.get(i);
-            if (currentObject.getMass() != 0) {
-                Vector2d totalForce = new Vector2d(0, 0);
-                for (int j = 0; j < this.objects.size(); j++) {
-                    if (j != i) {
-                        totalForce = totalForce.add(currentObject.getGravitationalForce(this.objects.get(j)));
-                    }
-                }
-                currentObject.velocity = currentObject.velocity.add(totalForce.multiply(deltaTime / currentObject.getMass()));
-            }
-            currentObject.position.x += currentObject.velocity.x * deltaTime;
-            currentObject.position.y += currentObject.velocity.y * deltaTime;
-            if (currentObject.position.x < currentObject.radius) {
-                currentObject.position.x = 2 * currentObject.radius - currentObject.position.x;
-                currentObject.velocity.x *= -1;
-            }
-            if (currentObject.position.x > this.getWidth() - currentObject.radius) {
-                currentObject.position.x = 2 * (this.getWidth() - currentObject.radius) - currentObject.position.x;
-                currentObject.velocity.x *= -1;
-            }
-            if (currentObject.position.y < currentObject.radius + this.getHeight() / 16) {
-                currentObject.position.y = 2 * (currentObject.radius + this.getHeight() / 16) - currentObject.position.y;
-                currentObject.velocity.y *= -1;
-            }
-            if (currentObject.position.y > this.getHeight() - currentObject.radius) {
-                currentObject.position.y = 2 * (this.getHeight() - currentObject.radius) - currentObject.position.y;
-                currentObject.velocity.y *= -1;
-            }
-        }
-        for (int i = 0; i < this.objects.size(); i++) {
-            for (int j = i + 1; j < this.objects.size(); j++) {
-                GravitationalObject o1 = this.objects.get(i);
-                GravitationalObject o2 = this.objects.get(j);
-                if (o1.doesCollide(o2)) {
-                    Vector2d distanceVector = o1.position.subtract(o2.position);
-                    double collisionFactor = o1.velocity.subtract(o2.velocity).dot(distanceVector) / distanceVector.dot(distanceVector);
-                    Vector2d addVector = distanceVector.multiply(2 / (o1.getMass() + o2.getMass()) * collisionFactor);
-                    o1.velocity = o1.velocity.subtract(addVector.multiply(o2.getMass()));
-                    o2.velocity = o2.velocity.add(addVector.multiply(o1.getMass()));
-                    Vector2d totalShift = distanceVector.multiply((o1.radius + o2.radius) / distanceVector.getLength() * 2 - 2);
-                    double o1VelocityFraction = o1.velocity.getLength() / (o1.velocity.getLength() + o2.velocity.getLength());
-                    double o2VelocityFraction = 1 - o1VelocityFraction;
-                    Vector2d o1Shift = totalShift.multiply(o1VelocityFraction);
-                    Vector2d o2Shift = totalShift.multiply(-o2VelocityFraction);
-                    o1.position = o1.position.add(o1Shift);
-                    o2.position = o2.position.add(o2Shift);
-                }
-            }
-        }
+        this.scaleDetector = new ScaleGestureDetector(attachedTo.getApplicationContext(), new ScaleListener(this));
     }
 
     @Override
@@ -102,18 +45,17 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         Paint p = new Paint();
         p.setColor(Color.BLACK);
         canvas.drawRect(new Rect(0, 0, canvas.getWidth(), canvas.getHeight()), p);
-        p.setColor(Color.WHITE);
-        Rect menuButtonRect = new Rect(0, 0, canvas.getWidth(), canvas.getHeight() / 16);
-        canvas.drawRect(menuButtonRect, p);
-        for (int i = 0; i < this.objects.size(); i++) {
-            this.objects.get(i).draw(canvas, 0);
-        }
-        if (this.attachedTo.addingObject == null && !this.changingVelocity) {
+        this.space.draw(canvas);
+        if (this.changingVelocity) {
+            this.space.drawObjectVelocity(canvas, this.lastObjectInfoShown);
+            p.setColor(Color.WHITE);
+            Rect confirmButton = new Rect(0, canvas.getHeight() * 15 / 16, canvas.getWidth(), canvas.getHeight());
+            canvas.drawRect(confirmButton, p);
             p.setColor(Color.BLACK);
-            StringDraw.drawMaxString("Menu", menuButtonRect, canvas.getHeight() / 128, canvas, p);
+            StringDraw.drawMaxString("Confirm", confirmButton, canvas.getHeight() / 64, canvas, p);
         }
-        else if (this.attachedTo.addingObject != null) {
-            this.attachedTo.addingObject.draw(canvas, this.isAddingObjectValid ? Color.GREEN : Color.RED);
+        if (this.attachedTo.addingObject != null) {
+            this.space.drawSpecific(canvas, this.attachedTo.addingObject, this.isAddingObjectValid ? Color.GREEN : Color.RED, this.positionConfirmed);
         }
         if (this.confirmHidingState != 0 || this.attachedTo.addingObject != null) {
             int alpha = this.attachedTo.addingObject != null ? 127 : (int) (this.confirmHidingState * 127);
@@ -122,10 +64,6 @@ public class GravityView extends View implements DialogInterface.OnClickListener
             p.setColor(Color.BLACK);
             StringDraw.drawMaxString("Cancel", new Rect(0, canvas.getHeight() * 15 / 16, canvas.getWidth() / 2, canvas.getHeight()), canvas.getHeight() / 64, canvas, p);
             StringDraw.drawMaxString(this.positionConfirmed ? "Confirm velocity" : "Confirm position", new Rect(canvas.getWidth() / 2, canvas.getHeight() * 15 / 16, canvas.getWidth(), canvas.getHeight()), canvas.getHeight() / 64, canvas, p);
-        }
-        if (this.attachedTo.addingObject != null && this.positionConfirmed) {
-            p.setColor(Color.RED);
-            drawVelocity(canvas, p, this.attachedTo.addingObject);
         }
         if (this.simulationPaused) {
             p.setColor(Color.argb(63, 255, 255, 255));
@@ -139,42 +77,17 @@ public class GravityView extends View implements DialogInterface.OnClickListener
                 objectToUse = this.lastObjectInfoShown;
             }
             else {
-                objectToUse = this.objects.get(this.objectInfoIndex);
-                p.setColor(Color.RED);
-                drawVelocity(canvas, p, objectToUse);
+                objectToUse = this.space.getObject(this.objectInfoIndex);
+                this.space.drawObjectVelocity(canvas, this.objectInfoIndex);
             }
             objectToUse.drawInfo(canvas, MainActivity.getMovableViewPosition(this.objectInfoState, 0));
         }
-        if (this.changingVelocity) {
-            p.setColor(Color.RED);
-            drawVelocity(canvas, p, this.lastObjectInfoShown);
-            p.setColor(Color.WHITE);
-            Rect confirmButton = new Rect(0, canvas.getHeight() * 15 / 16, canvas.getWidth(), canvas.getHeight());
-            canvas.drawRect(confirmButton, p);
+        p.setColor(Color.WHITE);
+        Rect menuButtonRect = new Rect(0, 0, canvas.getWidth(), canvas.getHeight() / 16);
+        canvas.drawRect(menuButtonRect, p);
+        if (this.attachedTo.addingObject == null && !this.changingVelocity) {
             p.setColor(Color.BLACK);
-            StringDraw.drawMaxString("Confirm", confirmButton, canvas.getHeight() / 64, canvas, p);
-        }
-    }
-
-    /*
-    * Draws an arrow from the center of the passed GravitationalObject pointing in the direction of the velocity of the object.
-     */
-    private void drawVelocity(Canvas canvas, Paint p, GravitationalObject object) {
-        if (object.velocity.x != 0 || object.velocity.y != 0) {
-            canvas.save();
-            float totalSpeed = (float) object.velocity.getLength() * 32;
-            canvas.translate((float) object.position.x, (float) object.position.y);
-            canvas.rotate((float) (Math.atan2(object.velocity.y, object.velocity.x) / Math.PI * 180));
-            canvas.scale(totalSpeed / 1000, totalSpeed / 1000);
-            canvas.drawRect(new Rect(0, -50, 800, 50), p);
-            Path trianglePath = new Path();
-            trianglePath.moveTo(800, -100);
-            trianglePath.lineTo(1000, 0);
-            trianglePath.lineTo(800, 100);
-            trianglePath.lineTo(800, -100);
-            trianglePath.close();
-            canvas.drawPath(trianglePath, p);
-            canvas.restore();
+            StringDraw.drawMaxString("Menu", menuButtonRect, canvas.getHeight() / 128, canvas, p);
         }
     }
 
@@ -183,18 +96,13 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         super.onTouchEvent(event);
         if (!this.attachedTo.paused || this.attachedTo.addingObject != null) {
             this.gestureDetector.onTouchEvent(event);
+            this.scaleDetector.onTouchEvent(event);
         }
         return true;
     }
 
     void validateAddingObject() {
-        this.isAddingObjectValid = true;
-        for (int i = 0; i < this.objects.size(); i++) {
-            if (this.attachedTo.addingObject.doesCollide(this.objects.get(i))) {
-                this.isAddingObjectValid = false;
-                break;
-            }
-        }
+        this.isAddingObjectValid = !this.space.doesCollide(this.attachedTo.addingObject);
     }
 
     void update() {
@@ -208,7 +116,7 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         }
         if (!this.attachedTo.paused && !this.simulationPaused && !this.changingVelocity) {
             for (int i = 0; i < 64; i++) {
-                this.updateObjects(1 / (double) 64);
+                this.space.updateObjects(1 / (double) 64);
             }
             doInvalidate = true;
         }
@@ -254,7 +162,7 @@ public class GravityView extends View implements DialogInterface.OnClickListener
     }
 
     private void hideObjectInfo() {
-        this.lastObjectInfoShown = this.objects.get(this.objectInfoIndex);
+        this.lastObjectInfoShown = this.space.getObject(this.objectInfoIndex);
         this.objectInfoIndex = -1;
     }
 
@@ -276,16 +184,34 @@ public class GravityView extends View implements DialogInterface.OnClickListener
     public void onClick(DialogInterface dialog, int which) {
         int indexToRemove = this.objectInfoIndex;
         this.hideObjectInfo();
-        if (this.objects.size() == 0) {
-            this.attachedTo.unlockOrientation();
-        }
-        this.objects.remove(indexToRemove);
+        this.space.removeObject(indexToRemove);
         dialog.cancel();
     }
 
     void clearAllObjects() {
-        this.objects.clear();
-        this.attachedTo.unlockOrientation();
+        this.space = new GravitySpace();
+    }
+
+    public Vector2d getSpaceViewPosition() {
+        return this.space.getViewPosition();
+    }
+
+    private static class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
+
+        private final GravityView attachedTo;
+
+        public ScaleListener(GravityView attachedTo) {
+            this.attachedTo = attachedTo;
+        }
+
+        @Override
+        public boolean onScale(ScaleGestureDetector detector) {
+            super.onScale(detector);
+            Vector2d spaceLocation = this.attachedTo.space.getSpaceLocation(new Vector2d(detector.getFocusX(), detector.getFocusY()), this.attachedTo.getWidth(), this.attachedTo.getHeight());
+            this.attachedTo.space.scale(detector.getScaleFactor(), spaceLocation);
+            this.attachedTo.postInvalidate();
+            return true;
+        }
     }
 
     private static class GestureListener extends GestureDetector.SimpleOnGestureListener {
@@ -312,8 +238,7 @@ public class GravityView extends View implements DialogInterface.OnClickListener
                         if (e.getY() >= this.attachedTo.getHeight() * 15 / 16) {
                             if (e.getX() >= this.attachedTo.getWidth() / 2) {
                                 if (this.attachedTo.positionConfirmed) {
-                                    this.attachedTo.objects.add(this.attachedTo.attachedTo.addingObject);
-                                    this.attachedTo.attachedTo.lockOrientation();
+                                    this.attachedTo.space.addObject(this.attachedTo.attachedTo.addingObject);
                                     this.attachedTo.attachedTo.addingObject = null;
                                     this.attachedTo.confirmHidingState = 1;
                                     this.attachedTo.positionConfirmed = false;
@@ -333,25 +258,12 @@ public class GravityView extends View implements DialogInterface.OnClickListener
                         else {
                             if (e.getY() > this.attachedTo.getHeight() / 16) {
                                 GravitationalObject addingObject = this.attachedTo.attachedTo.addingObject;
+                                Vector2d spaceClickLocation = this.attachedTo.space.getSpaceLocation(new Vector2d(e.getX(), e.getY()), this.attachedTo.getWidth(), this.attachedTo.getHeight());
                                 if (this.attachedTo.positionConfirmed) {
-                                    addingObject.velocity.x = (e.getX() - addingObject.position.x) / 32;
-                                    addingObject.velocity.y = (e.getY() - addingObject.position.y) / 32;
+                                    addingObject.velocity = spaceClickLocation.subtract(addingObject.position).multiply(1 / (double) 32);
                                 }
                                 else {
-                                    addingObject.position.x = e.getX();
-                                    addingObject.position.y = e.getY();
-                                    if (addingObject.position.x < addingObject.radius) {
-                                        addingObject.position.x = addingObject.radius;
-                                    }
-                                    else if (addingObject.position.x > this.attachedTo.getWidth() - addingObject.radius) {
-                                        addingObject.position.x = this.attachedTo.getWidth() - addingObject.radius;
-                                    }
-                                    if (addingObject.position.y < this.attachedTo.getHeight() / 16 + addingObject.radius) {
-                                        addingObject.position.y = this.attachedTo.getHeight() / 16 + addingObject.radius;
-                                    }
-                                    else if (addingObject.position.y > this.attachedTo.getHeight() - addingObject.radius) {
-                                        addingObject.position.y = this.attachedTo.getHeight() - addingObject.radius;
-                                    }
+                                    addingObject.position = spaceClickLocation;
                                     this.attachedTo.validateAddingObject();
                                 }
                                 this.attachedTo.postInvalidate();
@@ -359,12 +271,10 @@ public class GravityView extends View implements DialogInterface.OnClickListener
                         }
                     }
                     else {
-                        for (int i = 0; i < this.attachedTo.objects.size(); i++) {
-                            GravitationalObject currentObject = this.attachedTo.objects.get(i);
-                            if (Math.sqrt(Math.pow(e.getX() - currentObject.position.x, 2) + Math.pow(e.getY() - currentObject.position.y, 2)) <= currentObject.radius) {
-                                this.attachedTo.showObjectInfo(i);
-                                break;
-                            }
+                        Vector2d spaceLocation = this.attachedTo.space.getSpaceLocation(new Vector2d(e.getX(), e.getY()), this.attachedTo.getWidth(), this.attachedTo.getHeight());
+                        int clickedIndex = this.attachedTo.space.isContainedIn(spaceLocation);
+                        if (clickedIndex != -1) {
+                            this.attachedTo.showObjectInfo(clickedIndex);
                         }
                     }
                 }
@@ -401,8 +311,8 @@ public class GravityView extends View implements DialogInterface.OnClickListener
             else {
                 if (e.getY() >= this.attachedTo.getHeight() / 16) {
                     GravitationalObject changingObject = this.attachedTo.lastObjectInfoShown;
-                    changingObject.velocity.x = (e.getX() - changingObject.position.x) / (double) 32;
-                    changingObject.velocity.y = (e.getY() - changingObject.position.y) / (double) 32;
+                    Vector2d spaceClickLocation = this.attachedTo.space.getSpaceLocation(new Vector2d(e.getX(), e.getY()), this.attachedTo.getWidth(), this.attachedTo.getHeight());
+                    changingObject.velocity = spaceClickLocation.subtract(changingObject.position).multiply(1 / (double) 32);
                     this.attachedTo.postInvalidate();
                 }
             }
@@ -416,6 +326,21 @@ public class GravityView extends View implements DialogInterface.OnClickListener
                 this.attachedTo.postInvalidate();
             }
             return true;
+        }
+
+        @Override
+        public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+            super.onScroll(e1, e2, distanceX, distanceY);
+            this.attachedTo.space.moveView(new Vector2d(distanceX, distanceY).multiply(1 / this.attachedTo.space.getEnlargement()));
+            this.attachedTo.postInvalidate();
+            return true;
+        }
+
+        @Override
+        public void onLongPress(MotionEvent e) {
+            super.onLongPress(e);
+            this.attachedTo.space.goToTheNearestObject();
+            this.attachedTo.postInvalidate();
         }
     }
 }

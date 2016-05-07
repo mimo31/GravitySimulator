@@ -2,7 +2,6 @@ package com.github.mimo31.gravitysimulator;
 
 import android.app.Activity;
 import android.content.DialogInterface;
-import android.content.pm.ActivityInfo;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -46,14 +45,6 @@ public class MainActivity extends Activity implements Runnable {
 
     public static float getMovableViewPosition(float state, float initialSpeed) {
         return (float) ((2 * initialSpeed - 2) * Math.pow(state, 3) + (3 - 3 * initialSpeed) * Math.pow(state, 2) + initialSpeed * state);
-    }
-
-    public void lockOrientation() {
-        this.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LOCKED);
-    }
-
-    public void unlockOrientation() {
-        this.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_USER);
     }
 
     @Override
@@ -100,7 +91,6 @@ public class MainActivity extends Activity implements Runnable {
         if (this.addObjectView == null) {
             this.addObjectView = this.getLayoutInflater().inflate(R.layout.add_object_layout, null);
             this.addContentView(this.addObjectView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-            ((TextView) this.findViewById(R.id.radiusText)).setHint("max " + this.getMaxRadius());
         }
         else {
             this.addObjectView.setX(0);
@@ -194,13 +184,11 @@ public class MainActivity extends Activity implements Runnable {
                 Toast.makeText(this.getApplicationContext(), "You must enter an object radius.", Toast.LENGTH_SHORT).show();
             }
             else {
-                int maxRadius = this.getMaxRadius();
                 int enteredRadius = Integer.parseInt(enteredRadiusText);
                 if (enteredRadius == 0) {
                     Toast.makeText(this.getApplicationContext(), "The radius you enter may not be 0.", Toast.LENGTH_SHORT).show();
-                }
-                else if (enteredRadius > maxRadius) {
-                    Toast.makeText(this.getApplicationContext(), "The radius you enter may not be bigger than " + String.valueOf(maxRadius) + ".", Toast.LENGTH_SHORT).show();
+                } else if (enteredRadius > 1000000) {
+                    Toast.makeText(this.getApplicationContext(), "The radius you enter may not be bigger than 1000000.", Toast.LENGTH_SHORT).show();
                 }
                 else {
                     String enteredDensityText = ((TextView) this.findViewById(R.id.densityText)).getText().toString();
@@ -213,7 +201,7 @@ public class MainActivity extends Activity implements Runnable {
                             Toast.makeText(this.getApplicationContext(), "The density you enter may not be bigger than 1000.", Toast.LENGTH_SHORT).show();
                         }
                         else {
-                            this.addingObject = new GravitationalObject(new Vector2d(this.getWidth() / (double)2, this.getHeight() / (double)2), enteredRadius, enteredDensity);
+                            this.addingObject = new GravitationalObject(this.attachedGravityView.getSpaceViewPosition(), enteredRadius, enteredDensity);
                             this.resume();
                             this.attachedGravityView.validateAddingObject();
                             this.attachedGravityView.postInvalidate();
@@ -229,10 +217,6 @@ public class MainActivity extends Activity implements Runnable {
             this.addObjectView.setVisibility(View.GONE);
             this.attachedPauseView.setVisibility(View.VISIBLE);
         }
-    }
-
-    private int getMaxRadius() {
-        return Math.min(this.getWidth(), this.getHeight()) / 2;
     }
 
     void pause() {

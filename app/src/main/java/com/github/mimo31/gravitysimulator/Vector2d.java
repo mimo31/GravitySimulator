@@ -1,5 +1,7 @@
 package com.github.mimo31.gravitysimulator;
 
+import android.graphics.PointF;
+
 /**
  * Created by Viktor on 3/11/2016.
  *
@@ -7,12 +9,17 @@ package com.github.mimo31.gravitysimulator;
  */
 public class Vector2d {
 
-    public double x;
-    public double y;
+    public final double x;
+    public final double y;
 
     public Vector2d(double x, double y) {
         this.x = x;
         this.y = y;
+    }
+
+    public Vector2d(PointF p) {
+        this.x = p.x;
+        this.y = p.y;
     }
 
     public double dot(Vector2d v) {
@@ -33,5 +40,9 @@ public class Vector2d {
 
     public Vector2d multiply(double factor) {
         return new Vector2d(this.x * factor, this.y * factor);
+    }
+
+    public double selfDot() {
+        return this.x * this.x + this.y * this.y;
     }
 }

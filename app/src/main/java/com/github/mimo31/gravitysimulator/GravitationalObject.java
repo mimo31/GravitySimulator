@@ -39,6 +39,11 @@ public class GravitationalObject {
         }
     }
 
+    public int getColor() {
+        int colorValue = (int) (255 - this.density / (float) 1000 * 255);
+        return Color.rgb(colorValue, colorValue, 255);
+    }
+
     public Vector2d getGravitationalForce(GravitationalObject object) {
         Vector2d distanceVector = new Vector2d(object.position.x - this.position.x, object.position.y - this.position.y);
         return distanceVector.multiply(this.getMass() * object.getMass() / Math.pow(distanceVector.getLength(), 3));
