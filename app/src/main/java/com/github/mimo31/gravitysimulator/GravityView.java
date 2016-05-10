@@ -5,6 +5,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.os.Bundle;
 import android.support.v4.view.GestureDetectorCompat;
 import android.support.v7.app.AlertDialog;
 import android.view.GestureDetector;
@@ -37,6 +38,12 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         this.attachedTo = attachedTo;
         this.gestureDetector = new GestureDetectorCompat(attachedTo.getApplicationContext(), new GestureListener(this));
         this.scaleDetector = new ScaleGestureDetector(attachedTo.getApplicationContext(), new ScaleListener(this));
+    }
+
+    public GravityView(MainActivity attachedTo, Bundle bundle) {
+        this(attachedTo);
+        this.space = new GravitySpace(bundle.getBundle("space"));
+        this.simulationPaused = bundle.getBoolean("simulationPaused");
     }
 
     @Override
@@ -194,6 +201,13 @@ public class GravityView extends View implements DialogInterface.OnClickListener
 
     public Vector2d getSpaceViewPosition() {
         return this.space.getViewPosition();
+    }
+
+    public Bundle putToBundle() {
+        Bundle bundle = new Bundle();
+        bundle.putBundle("space", this.space.putToBundle());
+        bundle.putBoolean("simulationPaused", this.simulationPaused);
+        return bundle;
     }
 
     private static class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {

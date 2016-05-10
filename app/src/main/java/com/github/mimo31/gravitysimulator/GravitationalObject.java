@@ -4,13 +4,15 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.os.Parcel;
+import android.os.Parcelable;
 
 /**
  * Created by Viktor on 3/11/2016.
  *
  * Class for representing one Object in the simulation of gravity.
  */
-public class GravitationalObject {
+public class GravitationalObject implements Parcelable {
 
     final int radius;
     final private int density;
@@ -38,6 +40,40 @@ public class GravitationalObject {
             canvas.drawCircle((float) this.position.x, (float) this.position.y, this.radius / 2, p);
         }
     }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel parcel, int flags) {
+        parcel.writeInt(this.radius);
+        parcel.writeInt(this.density);
+        parcel.writeDouble(this.position.x);
+        parcel.writeDouble(this.position.y);
+        parcel.writeDouble(this.velocity.x);
+        parcel.writeDouble(this.velocity.y);
+    }
+
+    private GravitationalObject(Parcel parcel) {
+        this.radius = parcel.readInt();
+        this.density = parcel.readInt();
+        this.position = new Vector2d(parcel.readDouble(), parcel.readDouble());
+        this.velocity = new Vector2d(parcel.readDouble(), parcel.readDouble());
+    }
+
+    private static Creator CREATOR = new Creator() {
+        @Override
+        public Object createFromParcel(Parcel source) {
+            return new GravitationalObject(source);
+        }
+
+        @Override
+        public Object[] newArray(int size) {
+            return new GravitationalObject[size];
+        }
+    };
 
     public int getColor() {
         int colorValue = (int) (255 - this.density / (float) 1000 * 255);

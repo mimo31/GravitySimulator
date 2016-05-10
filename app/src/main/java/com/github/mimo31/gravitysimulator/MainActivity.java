@@ -31,6 +31,7 @@ public class MainActivity extends Activity implements Runnable {
     private float pausingState;
     public boolean paused;
     private final Handler updateHandler = new Handler();
+    private boolean updating = true;
     private final int updateDelay = 17;
     public GravitationalObject addingObject;
     private boolean animatingHelp = false;
@@ -38,7 +39,11 @@ public class MainActivity extends Activity implements Runnable {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        this.attachedGravityView = new GravityView(this);
+        if (savedInstanceState != null) {
+            this.attachedGravityView = new GravityView(this, savedInstanceState.getBundle("GravityView"));
+        } else {
+            this.attachedGravityView = new GravityView(this);
+        }
         this.addContentView(this.attachedGravityView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         this.updateHandler.postDelayed(this, updateDelay);
     }
@@ -49,8 +54,10 @@ public class MainActivity extends Activity implements Runnable {
 
     @Override
     public void run() {
-        this.update();
-        updateHandler.postDelayed(this, updateDelay);
+        if (this.updating) {
+            this.update();
+            updateHandler.postDelayed(this, updateDelay);
+        }
     }
 
     private void update() {
@@ -209,6 +216,40 @@ public class MainActivity extends Activity implements Runnable {
                     }
                 }
             }
+        }
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putBundle("GravityView", this.attachedGravityView.putToBundle());
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        this.updating = false;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        this.updating = true;
+        this.updateHandler.postDelayed(this, updateDelay);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        boolean isNull = this.attachedGravityView == null;
+        if (isNull) {
+            if (savedInstanceState != null) {
+                this.attachedGravityView = new GravityView(this, savedInstanceState.getBundle("GravityView"));
+            } else {
+                this.attachedGravityView = new GravityView(this);
+            }
+            this.addContentView(this.attachedGravityView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            this.updateHandler.postDelayed(this, updateDelay);
         }
     }
 

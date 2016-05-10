@@ -5,8 +5,10 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
+import android.os.Bundle;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -60,6 +62,25 @@ public class GravitySpace {
                 }
             }
         }
+    }
+
+    public Bundle putToBundle() {
+        Bundle bundle = new Bundle();
+        bundle.putDouble("viewX", this.viewPosition.x);
+        bundle.putDouble("viewY", this.viewPosition.y);
+        bundle.putParcelableArray("objects", this.objects.toArray(new GravitationalObject[this.objects.size()]));
+        bundle.putDouble("zoom", this.zoomLevel);
+        return bundle;
+    }
+
+    public GravitySpace(Bundle bundle) {
+        this.viewPosition = new Vector2d(bundle.getDouble("viewX"), bundle.getDouble("viewY"));
+        this.objects = new ArrayList<>(Arrays.asList((GravitationalObject[]) bundle.getParcelableArray("objects")));
+        this.zoomLevel = bundle.getDouble("zoom");
+    }
+
+    public GravitySpace() {
+
     }
 
     public void draw(Canvas canvas) {
