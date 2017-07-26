@@ -51,7 +51,7 @@ public class MainActivity extends Activity implements Runnable {
     public static float getMovableViewPosition(float state, float initialSpeed) {
         return (float) ((2 * initialSpeed - 2) * Math.pow(state, 3) + (3 - 3 * initialSpeed) * Math.pow(state, 2) + initialSpeed * state);
     }
-
+    
     @Override
     public void run() {
         if (this.updating) {
