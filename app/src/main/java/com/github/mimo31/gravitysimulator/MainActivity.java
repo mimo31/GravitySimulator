@@ -18,6 +18,8 @@ import android.view.Window;
 import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -28,6 +30,7 @@ public class MainActivity extends Activity implements Runnable
     private PauseMenuView pauseView;
     private View addObjectView;
     private View helpView;
+    private View settingsView;
 
     private final Handler updateHandler = new Handler();
     private boolean updating = true;
@@ -251,7 +254,7 @@ public class MainActivity extends Activity implements Runnable
         @Override
         public void onAnimationStart(Animation animation)
         {
-            this.attachedTo.state = ViewState.ANIM_HELP;
+            this.attachedTo.state = ViewState.GENERIC_ANIM;
             this.attachedTo.helpView.setVisibility(View.VISIBLE);
         }
 
@@ -297,7 +300,7 @@ public class MainActivity extends Activity implements Runnable
         @Override
         public void onAnimationStart(Animation animation)
         {
-            this.attachedTo.state = ViewState.ANIM_HELP;
+            this.attachedTo.state = ViewState.GENERIC_ANIM;
             this.attachedTo.pauseView.setVisibility(View.VISIBLE);
         }
 
@@ -544,23 +547,37 @@ public class MainActivity extends Activity implements Runnable
         public void draw(Canvas canvas)
         {
             super.draw(canvas);
+
             Paint p = new Paint();
-            Rect addObjectRect = new Rect(0, 0, canvas.getWidth(), canvas.getHeight() * 8 / 15);
-            Rect clearRect = new Rect(0, addObjectRect.bottom, canvas.getWidth(), canvas.getHeight() * 12 / 15);
-            Rect helpRect = new Rect(0, clearRect.bottom, canvas.getWidth(), canvas.getHeight() * 14 / 15);
-            Rect backRect = new Rect(0, helpRect.bottom, canvas.getWidth(), canvas.getHeight());
+
+            int width = canvas.getWidth();
+            int height = canvas.getHeight();
+
+            // create rectangles for the buttons
+            Rect addObjectRect = new Rect(0, 0, width, height * 8 / 15);
+            Rect clearRect = new Rect(0, addObjectRect.bottom, width, height * 12 / 15);
+            Rect helpRect = new Rect(0, clearRect.bottom, width / 2, height * 14 / 15);
+            Rect settingsRect = new Rect(helpRect.right, clearRect.bottom, width, helpRect.bottom);
+            Rect backRect = new Rect(0, helpRect.bottom, width, height);
+
+            // draw the backgrounds for the buttons
             p.setColor(Color.RED);
             canvas.drawRect(addObjectRect, p);
             p.setColor(Color.GREEN);
             canvas.drawRect(clearRect, p);
             p.setColor(Color.BLUE);
             canvas.drawRect(helpRect, p);
+            p.setColor(Color.MAGENTA);
+            canvas.drawRect(settingsRect, p);
             p.setColor(Color.BLACK);
             canvas.drawRect(backRect, p);
+
+            // draw the text in the buttons
             p.setColor(Color.WHITE);
             StringDraw.drawMaxString("ADD NEW OBJECT", addObjectRect, canvas.getHeight() / 15, canvas, p);
             StringDraw.drawMaxString("CLEAR ALL OBJECTS", clearRect, canvas.getHeight() / 30, canvas, p);
             StringDraw.drawMaxString("HELP", helpRect, canvas.getHeight() / 60, canvas, p);
+            StringDraw.drawMaxString("SETTINGS", settingsRect, canvas.getHeight() / 60, canvas, p);
             StringDraw.drawMaxString("BACK", backRect, canvas.getHeight() / 120, canvas, p);
         }
 
@@ -577,16 +594,28 @@ public class MainActivity extends Activity implements Runnable
             @Override
             public boolean onSingleTapUp(MotionEvent e)
             {
-                float yPosition = e.getY();
-                if (yPosition > this.attachedTo.getHeight() * 14 / 15)
+                int width = this.attachedTo.getWidth();
+                int height = this.attachedTo.getHeight();
+
+                float tapX = e.getX();
+                float tapY = e.getY();
+
+                if (tapY > height * 14 / 15)
                 {
                     this.attachedTo.attachedTo.resume();
                 }
-                else if (yPosition > this.attachedTo.getHeight() * 12 / 15)
+                else if (tapY > height * 12 / 15)
                 {
-                    this.attachedTo.attachedTo.showHelp();
+                    if (tapX < width / 2)
+                    {
+                        this.attachedTo.attachedTo.showHelp();
+                    }
+                    else
+                    {
+                        this.attachedTo.attachedTo.showSettings();
+                    }
                 }
-                else if (yPosition > this.attachedTo.getHeight() * 8 / 15)
+                else if (tapY > height * 8 / 15)
                 {
                     AlertDialog.Builder alertBuilder = new AlertDialog.Builder(this.attachedTo.attachedTo, R.style.DialogTheme);
                     alertBuilder.setTitle("Confirm");
@@ -616,6 +645,134 @@ public class MainActivity extends Activity implements Runnable
                 this.attachedTo.attachedTo.gravityView.postInvalidate();
                 dialog.cancel();
             }
+        }
+    }
+
+    private static class SettingsChangeListener implements CompoundButton.OnCheckedChangeListener
+    {
+        private final MainActivity attachedTo;
+
+        private SettingsChangeListener(MainActivity attachedTo)
+        {
+            this.attachedTo = attachedTo;
+        }
+
+        @Override
+        public void onCheckedChanged(CompoundButton buttonView, boolean isChecked)
+        {
+            // set update the variables according to the state of the CheckBoxes in the settings
+
+            // find the CheckBoxes
+            CheckBox gridCheckBox = (CheckBox) this.attachedTo.findViewById(R.id.settingsGridCheckBox);
+            CheckBox followCheckBox = (CheckBox) this.attachedTo.findViewById(R.id.settingsFollowCheckBox);
+
+            // set the variables in the GravityView
+            GravityView gravityView = this.attachedTo.gravityView;
+            gravityView.showLineGrid = gridCheckBox.isChecked();
+            gravityView.followObjects = followCheckBox.isChecked();
+        }
+    }
+
+    /**
+     * Starts the animation of showing settings.
+     */
+    private void showSettings()
+    {
+        // create the HelpView if it hasn't been yet created
+        if (this.settingsView == null)
+        {
+            this.settingsView = this.getLayoutInflater().inflate(R.layout.settings_layout, null);
+            this.addContentView(this.settingsView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+            // set listeners to checked changes on the CheckBoxes
+            SettingsChangeListener listener = new SettingsChangeListener(this);
+            ((CheckBox) this.findViewById(R.id.settingsGridCheckBox)).setOnCheckedChangeListener(listener);
+            ((CheckBox) this.findViewById(R.id.settingsFollowCheckBox)).setOnCheckedChangeListener(listener);
+        }
+
+        // construct the animation of popping up from the middle of the screen
+        ScaleAnimation scaleAnimation = new ScaleAnimation(0, 1, 0, 1, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+        scaleAnimation.setDuration(200);
+        scaleAnimation.setAnimationListener(new ShowSettingsListener(this));
+
+        // start the animation
+        this.settingsView.startAnimation(scaleAnimation);
+    }
+
+    private static class ShowSettingsListener implements Animation.AnimationListener
+    {
+
+        final MainActivity attachedTo;
+
+        public ShowSettingsListener(MainActivity attachedTo)
+        {
+            this.attachedTo = attachedTo;
+        }
+
+        @Override
+        public void onAnimationStart(Animation animation)
+        {
+            this.attachedTo.state = ViewState.GENERIC_ANIM;
+            this.attachedTo.settingsView.setVisibility(View.VISIBLE);
+        }
+
+        @Override
+        public void onAnimationRepeat(Animation animation)
+        {
+
+        }
+
+        @Override
+        public void onAnimationEnd(Animation animation)
+        {
+            this.attachedTo.state = ViewState.SETTINGS_VIEW;
+            this.attachedTo.pauseView.setVisibility(View.GONE);
+        }
+    }
+
+    /**
+     * Starts the animation of disappearing in the middle of the screen.
+     * @param v the View that has caused the called (the button)
+     */
+    public void hideSettings(View v)
+    {
+        // construct the animation
+        ScaleAnimation scaleAnimation = new ScaleAnimation(1, 0, 1, 0, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+        scaleAnimation.setDuration(200);
+        scaleAnimation.setAnimationListener(new HideSettingsListener(this));
+
+        // start the animation
+        this.settingsView.startAnimation(scaleAnimation);
+    }
+
+    private static class HideSettingsListener implements Animation.AnimationListener
+    {
+
+        final MainActivity attachedTo;
+
+        public HideSettingsListener(MainActivity attachedTo)
+        {
+            this.attachedTo = attachedTo;
+        }
+
+        @Override
+        public void onAnimationStart(Animation animation)
+        {
+            this.attachedTo.state = ViewState.GENERIC_ANIM;
+            this.attachedTo.pauseView.setVisibility(View.VISIBLE);
+        }
+
+        @Override
+        public void onAnimationRepeat(Animation animation)
+        {
+
+        }
+
+        @Override
+        public void onAnimationEnd(Animation animation)
+        {
+            this.attachedTo.state = ViewState.PAUSE_VIEW;
+            this.attachedTo.settingsView.setVisibility(View.GONE);
         }
     }
 }

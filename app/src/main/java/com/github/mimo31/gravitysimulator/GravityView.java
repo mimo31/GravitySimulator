@@ -62,6 +62,13 @@ public class GravityView extends View implements DialogInterface.OnClickListener
     // GravitySpace - where all objects are stored (except the one that is being added and the deleted ones)
     private GravitySpace space = new GravitySpace();
 
+    // indicates whether the line grid in the background should be drawn
+    // this is can be directly specified by the user in the settings
+    public boolean showLineGrid = true;
+
+    // indicates whether the view should move along with the center of mass of the objects
+    public boolean followObjects = true;
+
     public GravityView(MainActivity attachedTo)
     {
         super(attachedTo.getApplicationContext());
@@ -91,7 +98,7 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         canvas.drawRect(new Rect(0, 0, width, height), p);
 
         // draw the GravitySpace
-        this.space.draw(canvas);
+        this.space.draw(canvas, this.showLineGrid);
 
         if (this.changingVelocity)
         {
@@ -241,8 +248,9 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         {
             for (int i = 0; i < 64; i++)
             {
-                this.space.update(1 / (double) 64, true);
+                this.space.update(1 / (double) 64, this.followObjects);
             }
+            this.space.updateViewVelocity();
             doInvalidate = true;
         }
 

@@ -116,33 +116,39 @@ public class GravitySpace
 
     }
 
-    public void draw(Canvas canvas)
+    public void draw(Canvas canvas, boolean drawLineGrid)
     {
         int width = canvas.getWidth();
         int height = canvas.getHeight();
 
         double enlargement = this.getEnlargement();
 
-        double lineDistance = 1024 * Math.exp(((int)(-this.zoomLevel) / 4) * 4);
-        Vector2d spaceViewStart = this.getSpaceLocation(new Vector2d(0, 0), width, height);
-        Vector2d spaceViewEnd = this.getSpaceLocation(new Vector2d(width, height), width, height);
-
         Paint p = new Paint();
-        p.setStrokeWidth(5);
-        p.setColor(Color.rgb(255, 255, 255));
 
-        for (double i = Math.floor(spaceViewStart.x / lineDistance) * lineDistance; i <= spaceViewEnd.x; i += lineDistance)
+        if (drawLineGrid)
         {
-            Vector2d startViewLocation = this.getViewLocation(new Vector2d(i, spaceViewStart.y), width, height);
-            Vector2d endViewLocation = this.getViewLocation(new Vector2d(i, spaceViewEnd.y), width, height);
-            canvas.drawLine((float)startViewLocation.x, (float)startViewLocation.y, (float)startViewLocation.x, (float)endViewLocation.y, p);
-        }
+            double lineDistance = 1024 * Math.exp(((int)(-this.zoomLevel) / 4) * 4);
+            Vector2d spaceViewStart = this.getSpaceLocation(new Vector2d(0, 0), width, height);
+            Vector2d spaceViewEnd = this.getSpaceLocation(new Vector2d(width, height), width, height);
 
-        for (double i = Math.floor(spaceViewStart.y / lineDistance) * lineDistance; i <= spaceViewEnd.y; i += lineDistance)
-        {
-            Vector2d startViewLocation = this.getViewLocation(new Vector2d(spaceViewStart.x, i), width, height);
-            Vector2d endViewLocation = this.getViewLocation(new Vector2d(spaceViewEnd.x, i), width, height);
-            canvas.drawLine((float)startViewLocation.x, (float)startViewLocation.y, (float)endViewLocation.x, (float)startViewLocation.y, p);
+            p.setStrokeWidth(5);
+            p.setColor(Color.rgb(255, 255, 255));
+
+            // draw the vertical lines
+            for (double i = Math.floor(spaceViewStart.x / lineDistance) * lineDistance; i <= spaceViewEnd.x; i += lineDistance)
+            {
+                Vector2d startViewLocation = this.getViewLocation(new Vector2d(i, spaceViewStart.y), width, height);
+                Vector2d endViewLocation = this.getViewLocation(new Vector2d(i, spaceViewEnd.y), width, height);
+                canvas.drawLine((float)startViewLocation.x, (float)startViewLocation.y, (float)startViewLocation.x, (float)endViewLocation.y, p);
+            }
+
+            // draw horizontal lines
+            for (double i = Math.floor(spaceViewStart.y / lineDistance) * lineDistance; i <= spaceViewEnd.y; i += lineDistance)
+            {
+                Vector2d startViewLocation = this.getViewLocation(new Vector2d(spaceViewStart.x, i), width, height);
+                Vector2d endViewLocation = this.getViewLocation(new Vector2d(spaceViewEnd.x, i), width, height);
+                canvas.drawLine((float)startViewLocation.x, (float)startViewLocation.y, (float)endViewLocation.x, (float)startViewLocation.y, p);
+            }
         }
 
         for (int i = 0; i < this.objects.size(); i++)
