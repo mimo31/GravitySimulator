@@ -17,303 +17,532 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.TextView;
 import android.widget.Toast;
 
-public class MainActivity extends Activity implements Runnable {
-
-    private GravityView attachedGravityView;
-    private PauseMenuView attachedPauseView;
+public class MainActivity extends Activity implements Runnable
+{
+    // attached views
+    private GravityView gravityView;
+    private PauseMenuView pauseView;
     private View addObjectView;
     private View helpView;
-    private boolean pausing;
-    private boolean resuming;
-    private float pausingState;
-    public boolean paused;
+
     private final Handler updateHandler = new Handler();
     private boolean updating = true;
     private final int updateDelay = 17;
     public GravitationalObject addingObject;
-    private boolean animatingHelp = false;
+
+    // state when an animation between view is performed
+    // starts at zero and is then animated to one
+    // when reaches one, the ViewState is switched from the animation to the actual View
+    // when no animation is being performed, should be equal set to 0
+    private float animationState = 0;
+
+    // specifies what is the app currently doing
+    public ViewState state = ViewState.SIMULATION;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState)
+    {
         super.onCreate(savedInstanceState);
-        if (savedInstanceState != null) {
-            this.attachedGravityView = new GravityView(this, savedInstanceState.getBundle("GravityView"));
-        } else {
-            this.attachedGravityView = new GravityView(this);
+        if (savedInstanceState != null)
+        {
+            this.gravityView = new GravityView(this, savedInstanceState.getBundle("GravityView"));
         }
-        this.addContentView(this.attachedGravityView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        else
+        {
+            this.gravityView = new GravityView(this);
+        }
+        this.addContentView(this.gravityView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         this.updateHandler.postDelayed(this, updateDelay);
     }
 
-    public static float getMovableViewPosition(float state, float initialSpeed) {
+    public static float getMovableViewPosition(float state, float initialSpeed)
+    {
         return (float) ((2 * initialSpeed - 2) * Math.pow(state, 3) + (3 - 3 * initialSpeed) * Math.pow(state, 2) + initialSpeed * state);
     }
-    
+
     @Override
-    public void run() {
-        if (this.updating) {
+    public void run()
+    {
+        if (this.updating)
+        {
             this.update();
             updateHandler.postDelayed(this, updateDelay);
         }
     }
 
-    private void update() {
-        if (this.pausing) {
-            this.pausingState += 0.08;
-            if (this.pausingState >= 1) {
-                this.pausingState = 1;
-                this.pausing = false;
+    /**
+     * Updates everything in the Activity.
+     * Should be called every updateDelay ms (when the Activity is shown to the user, else it doesn't need to be updated).
+     */
+    private void update()
+    {
+        // if the state is an animation
+        if (this.state == ViewState.ANIM_ADD_OBJECT_CANCEL || this.state == ViewState.ANIM_ADD_OBJECT_TO_GRAVITY ||
+                this.state == ViewState.ANIM_ADD_OBJECT_TO_PAUSE || this.state == ViewState.ANIM_PAUSE_TO_ADD_OBJECT ||
+                this.state == ViewState.ANIM_PAUSING || this.state == ViewState.ANIM_RESUMING)
+        {
+            // animate animationState
+            this.animationState += 0.08;
+            if (this.animationState > 1)
+            {
+                this.animationState = 1;
             }
-            this.updatePauseResumePosition();
-        }
-        else if (this.resuming) {
-            this.pausingState -= 0.08;
-            if (this.pausingState <= 0) {
-                this.pausingState = 0;
-                this.resuming = false;
-                if (this.addingObject == null) {
-                    this.paused = false;
+
+            // get the fraction of the distance the views in the animation have already travelled
+            float positionPart = getMovableViewPosition(this.animationState, 0.3f);
+
+            // dimensions of the Activity
+            int width = this.getWidth();
+            int height = this.getHeight();
+
+            // depending on which animation is being performed, update the positions of the views
+            switch (this.state)
+            {
+                case ANIM_ADD_OBJECT_CANCEL:
+                    this.gravityView.setX(positionPart * width);
+                    this.addObjectView.setX((positionPart - 1) * width);
+                    break;
+                case ANIM_ADD_OBJECT_TO_GRAVITY:
+                    this.addObjectView.setX(-positionPart * width);
+                    this.gravityView.setX((1 - positionPart) * width);
+                    break;
+                case ANIM_ADD_OBJECT_TO_PAUSE:
+                    this.addObjectView.setY(-positionPart * height);
+                    this.pauseView.setY((1 - positionPart) * height);
+                    break;
+                case ANIM_PAUSE_TO_ADD_OBJECT:
+                    this.pauseView.setY(positionPart * height);
+                    this.addObjectView.setY((positionPart - 1) * height);
+                    break;
+                case ANIM_PAUSING:
+                    this.gravityView.setX(positionPart * width);
+                    this.pauseView.setX((positionPart - 1) * width);
+                    break;
+                case ANIM_RESUMING:
+                    this.pauseView.setX(-positionPart * width);
+                    this.gravityView.setX((1 - positionPart) * width);
+            }
+
+            // if the state == 1, the animation has ended, change the view state and hide the old view
+            if (this.animationState == 1)
+            {
+                switch (this.state)
+                {
+                    case ANIM_ADD_OBJECT_CANCEL:
+                        this.state = ViewState.ADD_OBJECT_VIEW;
+                        this.gravityView.setVisibility(View.GONE);
+                        break;
+                    case ANIM_ADD_OBJECT_TO_GRAVITY:
+                        this.state = ViewState.ADDING_OBJECT;
+                        this.addObjectView.setVisibility(View.GONE);
+                        break;
+                    case ANIM_ADD_OBJECT_TO_PAUSE:
+                        this.state = ViewState.PAUSE_VIEW;
+                        this.addObjectView.setVisibility(View.GONE);
+                        break;
+                    case ANIM_PAUSE_TO_ADD_OBJECT:
+                        this.state = ViewState.ADD_OBJECT_VIEW;
+                        this.pauseView.setVisibility(View.GONE);
+
+                        // focus on the radius EditText and pop up the keyboard
+                        this.addObjectView.findViewById(R.id.radiusText).requestFocus();
+                        this.showSoftKeyboard();
+                        break;
+                    case ANIM_PAUSING:
+                        this.state = ViewState.PAUSE_VIEW;
+                        this.gravityView.setVisibility(View.GONE);
+                        break;
+                    case ANIM_RESUMING:
+                        this.state = ViewState.SIMULATION;
+                        this.pauseView.setVisibility(View.GONE);
+                        break;
                 }
+                this.animationState = 0;
             }
-            this.updatePauseResumePosition();
         }
-        this.attachedGravityView.update();
-    }
 
-    private void updatePauseResumePosition() {
-        float position = getMovableViewPosition(this.pausingState, 0.3f);
-        this.attachedGravityView.setX((int) (position * this.attachedGravityView.getWidth()));
-        if (this.addingObject != null) {
-            this.addObjectView.setX((int) ((position - 1) * this.getWidth()));
-        }
-        else {
-            this.attachedPauseView.setX((int) ((position - 1) * this.getWidth()));
+        // update the GravityView if needed
+        if (this.state == ViewState.SIMULATION)
+        {
+            this.gravityView.update();
         }
     }
 
-    private void addNewObject() {
-        if (this.addObjectView == null) {
+    /**
+     * Starts the animation of showing the AddObjectView and hiding the PauseView.
+     */
+    private void addNewObject()
+    {
+        this.state = ViewState.ANIM_PAUSE_TO_ADD_OBJECT;
+
+        // create the AddObjectView if it hasn't been yet created
+        if (this.addObjectView == null)
+        {
             this.addObjectView = this.getLayoutInflater().inflate(R.layout.add_object_layout, null);
             this.addContentView(this.addObjectView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         }
-        else {
-            this.addObjectView.setX(0);
-            this.addObjectView.setVisibility(View.VISIBLE);
-            this.clearAddObjectView();
-        }
-        this.attachedPauseView.setVisibility(View.GONE);
+
+        int height = this.getHeight();
+
+        // set the correct initial position of the AddObjectView
+        this.addObjectView.setX(0);
+        this.addObjectView.setY(-height);
+
+        // show the AddObjectView
+        this.addObjectView.setVisibility(View.VISIBLE);
+
+        // clear its EditTexts
+        this.clearAddObjectView();
     }
 
-    private void clearAddObjectView() {
+    /**
+     * Pops up the soft keyboard.
+     */
+    private void showSoftKeyboard()
+    {
+        InputMethodManager inputMethodManager = (InputMethodManager) getSystemService(this.getApplicationContext().INPUT_METHOD_SERVICE);
+        inputMethodManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+    }
+
+    /**
+     * Clears the text in the AddObjectView.
+     */
+    private void clearAddObjectView()
+    {
         ((TextView) this.addObjectView.findViewById(R.id.radiusText)).setText("");
         ((TextView) this.addObjectView.findViewById(R.id.densityText)).setText("");
     }
 
-    private void showHelp() {
-        if (this.helpView == null) {
+    /**
+     * Starts the animation of showing help.
+     */
+    private void showHelp()
+    {
+        // create the HelpView if it hasn't been yet created
+        if (this.helpView == null)
+        {
             this.helpView = this.getLayoutInflater().inflate(R.layout.help_layout, null);
             this.addContentView(this.helpView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         }
+
+        // construct the animation of popping up from the middle of the screen
         ScaleAnimation scaleAnimation = new ScaleAnimation(0, 1, 0, 1, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
         scaleAnimation.setDuration(200);
         scaleAnimation.setAnimationListener(new ShowHelpListener(this));
+
+        // start the animation
         this.helpView.startAnimation(scaleAnimation);
     }
 
-    private static class ShowHelpListener implements Animation.AnimationListener {
+    private static class ShowHelpListener implements Animation.AnimationListener
+    {
 
         final MainActivity attachedTo;
 
-        public ShowHelpListener(MainActivity attachedTo) {
+        public ShowHelpListener(MainActivity attachedTo)
+        {
             this.attachedTo = attachedTo;
         }
 
         @Override
-        public void onAnimationStart(Animation animation) {
-            this.attachedTo.animatingHelp = true;
+        public void onAnimationStart(Animation animation)
+        {
+            this.attachedTo.state = ViewState.ANIM_HELP;
             this.attachedTo.helpView.setVisibility(View.VISIBLE);
         }
 
         @Override
-        public void onAnimationRepeat(Animation animation) {
+        public void onAnimationRepeat(Animation animation)
+        {
 
         }
 
         @Override
-        public void onAnimationEnd(Animation animation) {
-            this.attachedTo.animatingHelp = false;
-            this.attachedTo.attachedPauseView.setVisibility(View.GONE);
+        public void onAnimationEnd(Animation animation)
+        {
+            this.attachedTo.state = ViewState.HELP_VIEW;
+            this.attachedTo.pauseView.setVisibility(View.GONE);
         }
     }
 
-    public void hideHelp(View v) {
-        if (!this.animatingHelp) {
-            ScaleAnimation scaleAnimation = new ScaleAnimation(1, 0, 1, 0, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
-            scaleAnimation.setDuration(200);
-            scaleAnimation.setAnimationListener(new HideHelpListener(this));
-            this.helpView.startAnimation(scaleAnimation);
-        }
+    /**
+     * Starts the animation of disappearing in the middle of the screen.
+     * @param v the View that has caused the called (the button)
+     */
+    public void hideHelp(View v)
+    {
+        // construct the animation
+        ScaleAnimation scaleAnimation = new ScaleAnimation(1, 0, 1, 0, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+        scaleAnimation.setDuration(200);
+        scaleAnimation.setAnimationListener(new HideHelpListener(this));
+
+        // start the animation
+        this.helpView.startAnimation(scaleAnimation);
     }
 
-    private static class HideHelpListener implements Animation.AnimationListener {
+    private static class HideHelpListener implements Animation.AnimationListener
+    {
 
         final MainActivity attachedTo;
 
-        public HideHelpListener(MainActivity attachedTo) {
+        public HideHelpListener(MainActivity attachedTo)
+        {
             this.attachedTo = attachedTo;
         }
 
         @Override
-        public void onAnimationStart(Animation animation) {
-            this.attachedTo.animatingHelp = true;
-            this.attachedTo.attachedPauseView.setVisibility(View.VISIBLE);
+        public void onAnimationStart(Animation animation)
+        {
+            this.attachedTo.state = ViewState.ANIM_HELP;
+            this.attachedTo.pauseView.setVisibility(View.VISIBLE);
         }
 
         @Override
-        public void onAnimationRepeat(Animation animation) {
+        public void onAnimationRepeat(Animation animation)
+        {
 
         }
 
         @Override
-        public void onAnimationEnd(Animation animation) {
-            this.attachedTo.animatingHelp = false;
+        public void onAnimationEnd(Animation animation)
+        {
+            this.attachedTo.state = ViewState.PAUSE_VIEW;
             this.attachedTo.helpView.setVisibility(View.GONE);
         }
     }
 
-    public void confirmObjectAddition(View v) {
-        if (v.getId() == R.id.addConfirmButton) {
-            String enteredRadiusText = ((TextView) this.findViewById(R.id.radiusText)).getText().toString();
-            if (enteredRadiusText.equals("")) {
-                Toast.makeText(this.getApplicationContext(), "You must enter an object radius.", Toast.LENGTH_SHORT).show();
-            }
-            else {
-                int enteredRadius = Integer.parseInt(enteredRadiusText);
-                if (enteredRadius == 0) {
-                    Toast.makeText(this.getApplicationContext(), "The radius you enter may not be 0.", Toast.LENGTH_SHORT).show();
-                } else if (enteredRadius > 1000000) {
-                    Toast.makeText(this.getApplicationContext(), "The radius you enter may not be bigger than 1000000.", Toast.LENGTH_SHORT).show();
-                }
-                else {
-                    String enteredDensityText = ((TextView) this.findViewById(R.id.densityText)).getText().toString();
-                    if (enteredDensityText.equals("")) {
-                        Toast.makeText(this.getApplicationContext(), "You must enter an object density.", Toast.LENGTH_SHORT).show();
-                    }
-                    else {
-                        int enteredDensity = Integer.parseInt(enteredDensityText);
-                        if (enteredDensity > 1000) {
-                            Toast.makeText(this.getApplicationContext(), "The density you enter may not be bigger than 1000.", Toast.LENGTH_SHORT).show();
-                        }
-                        else {
-                            this.addingObject = new GravitationalObject(this.attachedGravityView.getSpaceViewPosition(), enteredRadius, enteredDensity);
-                            this.resume();
-                            this.attachedGravityView.validateAddingObject();
-                            this.attachedGravityView.postInvalidate();
-                        }
-                    }
-                }
-            }
+    /**
+     * Check that the parameters entered for the new object are valid.
+     * If they are, starts the animation to the GravityView where the position and velocity are set.
+     * @param v the View that has caused the call (the button)
+     */
+    public void confirmObjectAddition(View v)
+    {
+        // make sure the call is from the proper button
+        if (v.getId() != R.id.addConfirmButton)
+        {
+            return;
         }
+
+        // make sure the user entered the radius
+        String enteredRadiusText = ((TextView) this.findViewById(R.id.radiusText)).getText().toString();
+        if (enteredRadiusText.equals(""))
+        {
+            Toast.makeText(this.getApplicationContext(), "You must enter an object radius.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // make sure the radius is in the valid range
+        int enteredRadius = Integer.parseInt(enteredRadiusText);
+        if (enteredRadius == 0)
+        {
+            Toast.makeText(this.getApplicationContext(), "The radius you enter may not be 0.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        else if (enteredRadius > 1000000)
+        {
+            Toast.makeText(this.getApplicationContext(), "The radius you enter may not be bigger than 1000000.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // make sure the user entered the density
+        String enteredDensityText = ((TextView) this.findViewById(R.id.densityText)).getText().toString();
+        if (enteredDensityText.equals(""))
+        {
+            Toast.makeText(this.getApplicationContext(), "You must enter an object density.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // make sure the density is in the valid range
+        int enteredDensity = Integer.parseInt(enteredDensityText);
+        if (enteredDensity > 1000)
+        {
+            Toast.makeText(this.getApplicationContext(), "The density you enter may not be bigger than 1000.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // create the object to be added
+        this.addingObject = new GravitationalObject(this.gravityView.getSpaceViewPosition(), enteredRadius, enteredDensity);
+
+        this.state = ViewState.ANIM_ADD_OBJECT_TO_GRAVITY;
+
+        int width = this.getWidth();
+
+        // set the correct position for the GravityView
+        this.gravityView.setX(width);
+        this.gravityView.setY(0);
+
+        // show the GravityView
+        this.gravityView.setVisibility(View.VISIBLE);
+
+        // prepare the GravityView
+        this.gravityView.startAddingObject();
+        this.gravityView.postInvalidate();
     }
 
     @Override
-    protected void onSaveInstanceState(Bundle outState) {
+    protected void onSaveInstanceState(Bundle outState)
+    {
         super.onSaveInstanceState(outState);
-        outState.putBundle("GravityView", this.attachedGravityView.putToBundle());
+        outState.putBundle("GravityView", this.gravityView.putToBundle());
     }
 
     @Override
-    protected void onPause() {
+    protected void onPause()
+    {
         super.onPause();
         this.updating = false;
     }
 
     @Override
-    protected void onResume() {
+    protected void onResume()
+    {
         super.onResume();
         this.updating = true;
         this.updateHandler.postDelayed(this, updateDelay);
     }
 
     @Override
-    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+    protected void onRestoreInstanceState(Bundle savedInstanceState)
+    {
         super.onRestoreInstanceState(savedInstanceState);
-        boolean isNull = this.attachedGravityView == null;
-        if (isNull) {
-            if (savedInstanceState != null) {
-                this.attachedGravityView = new GravityView(this, savedInstanceState.getBundle("GravityView"));
-            } else {
-                this.attachedGravityView = new GravityView(this);
+        boolean isNull = this.gravityView == null;
+        if (isNull)
+        {
+            if (savedInstanceState != null)
+            {
+                this.gravityView = new GravityView(this, savedInstanceState.getBundle("GravityView"));
             }
-            this.addContentView(this.attachedGravityView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            else
+            {
+                this.gravityView = new GravityView(this);
+            }
+            this.addContentView(this.gravityView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             this.updateHandler.postDelayed(this, updateDelay);
         }
     }
 
-    public void cancelObjectAddition(View v) {
-        if (v.getId() == R.id.addCancelButton) {
-            this.addObjectView.setVisibility(View.GONE);
-            this.attachedPauseView.setVisibility(View.VISIBLE);
+    public void cancelObjectAddition(View v)
+    {
+        if (v.getId() == R.id.addCancelButton)
+        {
+            this.state = ViewState.ANIM_ADD_OBJECT_TO_PAUSE;
+
+            int height = this.getHeight();
+
+            // set correct initial position for the PauseView
+            this.pauseView.setX(0);
+            this.pauseView.setY(height);
+
+            // show the PauseView
+            this.pauseView.setVisibility(View.VISIBLE);
         }
     }
 
-    void pause() {
-        this.paused = true;
-        this.pausing = true;
-        if (this.attachedPauseView == null) {
-            this.attachedPauseView = new PauseMenuView(this);
-            this.addContentView(this.attachedPauseView, new ViewGroup.LayoutParams(this.getWidth(), this.getHeight()));
-            this.attachedPauseView.setX(-this.getWidth());
+    /**
+     * Starts the animation of hiding the GravityView and showing the PauseView.
+     */
+    void pause()
+    {
+        this.state = ViewState.ANIM_PAUSING;
+
+        int width = this.getWidth();
+        int height = this.getHeight();
+
+        // create the PauseView if it hasn't been yet created.
+        if (this.pauseView == null)
+        {
+            this.pauseView = new PauseMenuView(this);
+            this.addContentView(this.pauseView, new ViewGroup.LayoutParams(width, height));
         }
-        else {
-            if (this.addObjectView != null) {
-                this.addObjectView.setVisibility(View.GONE);
-            }
-            this.attachedPauseView.setVisibility(View.VISIBLE);
-        }
+
+        // set the correct initial position for PauseView
+        this.pauseView.setX(-width);
+        this.pauseView.setY(0);
+
+        // show the PauseView
+        this.pauseView.setVisibility(View.VISIBLE);
     }
 
-    private void resume() {
-        this.resuming = true;
+    /**
+     * Starts the animation of hiding the PauseView and showing the GravityView.
+     */
+    private void resume()
+    {
+        this.state = ViewState.ANIM_RESUMING;
+
+        // set the correct initial position for GravityView
+        int width = this.getWidth();
+        this.gravityView.setX(width);
+        this.gravityView.setY(0);
+
+        // show the GravityView
+        this.gravityView.setVisibility(View.VISIBLE);
     }
 
-    private int getWidth() {
+    /**
+     * @return the width of the Activity in pixels
+     */
+    private int getWidth()
+    {
         return this.getWindow().findViewById(Window.ID_ANDROID_CONTENT).getWidth();
     }
 
-    private int getHeight() {
+    /**
+     * @return the height of the Activity in pixels
+     */
+    private int getHeight()
+    {
         return this.getWindow().findViewById(Window.ID_ANDROID_CONTENT).getHeight();
     }
 
-    void cancelAdditionFromGravityView() {
-        this.pausing = true;
+    /**
+     * Starts the animation of showing back the AddObjectView and hiding the GravityView.
+     */
+    void cancelObjectAddFromGravity()
+    {
+        this.state = ViewState.ANIM_ADD_OBJECT_CANCEL;
+
+        // set the correct initial position for AddObjectView
+        int width = this.getWidth();
+        this.addObjectView.setX(-width);
+        this.addObjectView.setY(0);
+
+        // show the AddObjectView
+        this.addObjectView.setVisibility(View.VISIBLE);
     }
 
-    private static class PauseMenuView extends View {
+    private static class PauseMenuView extends View
+    {
 
         private final MainActivity attachedTo;
         private final GestureDetectorCompat gestureDetector;
 
-        public PauseMenuView(MainActivity attachedTo) {
+        public PauseMenuView(MainActivity attachedTo)
+        {
             super(attachedTo.getApplicationContext());
             this.attachedTo = attachedTo;
             this.gestureDetector = new GestureDetectorCompat(attachedTo.getApplicationContext(), new GestureListener(this));
         }
 
         @Override
-        public boolean onTouchEvent(MotionEvent event) {
+        public boolean onTouchEvent(MotionEvent event)
+        {
             super.onTouchEvent(event);
-            if (!this.attachedTo.pausing && !this.attachedTo.resuming && !this.attachedTo.animatingHelp) {
+            if (this.attachedTo.state == ViewState.PAUSE_VIEW)
+            {
                 this.gestureDetector.onTouchEvent(event);
             }
             return true;
         }
 
         @Override
-        public void draw(Canvas canvas) {
+        public void draw(Canvas canvas)
+        {
             super.draw(canvas);
             Paint p = new Paint();
             Rect addObjectRect = new Rect(0, 0, canvas.getWidth(), canvas.getHeight() * 8 / 15);
@@ -335,46 +564,56 @@ public class MainActivity extends Activity implements Runnable {
             StringDraw.drawMaxString("BACK", backRect, canvas.getHeight() / 120, canvas, p);
         }
 
-        private static class GestureListener extends GestureDetector.SimpleOnGestureListener implements DialogInterface.OnClickListener {
+        private static class GestureListener extends GestureDetector.SimpleOnGestureListener implements DialogInterface.OnClickListener
+        {
 
             private final PauseMenuView attachedTo;
 
-            public GestureListener(PauseMenuView attachedTo) {
+            public GestureListener(PauseMenuView attachedTo)
+            {
                 this.attachedTo = attachedTo;
             }
 
             @Override
-            public boolean onSingleTapUp(MotionEvent e) {
+            public boolean onSingleTapUp(MotionEvent e)
+            {
                 float yPosition = e.getY();
-                if (yPosition > this.attachedTo.getHeight() * 14 / 15) {
+                if (yPosition > this.attachedTo.getHeight() * 14 / 15)
+                {
                     this.attachedTo.attachedTo.resume();
                 }
-                else if (yPosition > this.attachedTo.getHeight() * 12 / 15) {
+                else if (yPosition > this.attachedTo.getHeight() * 12 / 15)
+                {
                     this.attachedTo.attachedTo.showHelp();
                 }
-                else if (yPosition > this.attachedTo.getHeight() * 8 / 15) {
+                else if (yPosition > this.attachedTo.getHeight() * 8 / 15)
+                {
                     AlertDialog.Builder alertBuilder = new AlertDialog.Builder(this.attachedTo.attachedTo, R.style.DialogTheme);
                     alertBuilder.setTitle("Confirm");
                     alertBuilder.setMessage("Are you sure you want to remove all the objects?");
                     alertBuilder.setPositiveButton("YES", this);
-                    alertBuilder.setNegativeButton("NO", new DialogInterface.OnClickListener() {
+                    alertBuilder.setNegativeButton("NO", new DialogInterface.OnClickListener()
+                    {
                         @Override
-                        public void onClick(DialogInterface dialog, int which) {
+                        public void onClick(DialogInterface dialog, int which)
+                        {
                             dialog.cancel();
                         }
                     });
                     alertBuilder.show();
                 }
-                else {
+                else
+                {
                     this.attachedTo.attachedTo.addNewObject();
                 }
                 return true;
             }
 
             @Override
-            public void onClick(DialogInterface dialog, int which) {
-                this.attachedTo.attachedTo.attachedGravityView.clearAllObjects();
-                this.attachedTo.attachedTo.attachedGravityView.postInvalidate();
+            public void onClick(DialogInterface dialog, int which)
+            {
+                this.attachedTo.attachedTo.gravityView.clearAllObjects();
+                this.attachedTo.attachedTo.gravityView.postInvalidate();
                 dialog.cancel();
             }
         }

@@ -16,10 +16,12 @@ import java.util.List;
  * <p/>
  * An class to handle object object gravity physics and displaying.
  */
-public class GravitySpace {
+public class GravitySpace
+{
 
     private List<GravitationalObject> objects = new ArrayList<>();
     private Vector2d viewPosition = new Vector2d(0, 0);
+    private Vector2d viewVelocity = new Vector2d(0, 0);
     /*
      * Represents the level of the zoom of the map. That is the natural logarithm of the actual enlargement.
      */
@@ -28,13 +30,18 @@ public class GravitySpace {
     /*
     * Moves the objects according to the laws of gravity.
      */
-    public void updateObjects(double deltaTime) {
-        for (int i = 0; i < this.objects.size(); i++) {
+    public void update(double deltaTime, boolean moveView)
+    {
+        for (int i = 0; i < this.objects.size(); i++)
+        {
             GravitationalObject currentObject = this.objects.get(i);
-            if (currentObject.getMass() != 0) {
+            if (currentObject.getMass() != 0)
+            {
                 Vector2d totalForce = new Vector2d(0, 0);
-                for (int j = 0; j < this.objects.size(); j++) {
-                    if (j != i) {
+                for (int j = 0; j < this.objects.size(); j++)
+                {
+                    if (j != i)
+                    {
                         totalForce = totalForce.add(currentObject.getGravitationalForce(this.objects.get(j)));
                     }
                 }
@@ -42,11 +49,14 @@ public class GravitySpace {
             }
             currentObject.position = currentObject.position.add(currentObject.velocity.multiply(deltaTime));
         }
-        for (int i = 0; i < this.objects.size(); i++) {
-            for (int j = i + 1; j < this.objects.size(); j++) {
+        for (int i = 0; i < this.objects.size(); i++)
+        {
+            for (int j = i + 1; j < this.objects.size(); j++)
+            {
                 GravitationalObject o1 = this.objects.get(i);
                 GravitationalObject o2 = this.objects.get(j);
-                if (o1.doesCollide(o2)) {
+                if (o1.doesCollide(o2))
+                {
                     Vector2d distanceVector = o1.position.subtract(o2.position);
                     double collisionFactor = o1.velocity.subtract(o2.velocity).dot(distanceVector) / distanceVector.dot(distanceVector);
                     Vector2d addVector = distanceVector.multiply(2 / (o1.getMass() + o2.getMass()) * collisionFactor);
@@ -62,9 +72,30 @@ public class GravitySpace {
                 }
             }
         }
+
+        // change the view position
+        if (moveView)
+        {
+            this.viewPosition = this.viewPosition.add(this.viewVelocity.multiply(deltaTime));
+        }
     }
 
-    public Bundle putToBundle() {
+    void updateViewVelocity()
+    {
+        Vector2d momentum = new Vector2d(0, 0);
+        double mass = 0;
+        for (int i = 0, n = this.objects.size(); i < n; i++)
+        {
+            GravitationalObject obj = this.objects.get(i);
+            double objMass = obj.getMass();
+            momentum = momentum.add(obj.velocity.multiply(objMass));
+            mass += objMass;
+        }
+        this.viewVelocity = momentum.multiply(1 / mass);
+    }
+
+    public Bundle putToBundle()
+    {
         Bundle bundle = new Bundle();
         bundle.putDouble("viewX", this.viewPosition.x);
         bundle.putDouble("viewY", this.viewPosition.y);
@@ -73,46 +104,80 @@ public class GravitySpace {
         return bundle;
     }
 
-    public GravitySpace(Bundle bundle) {
+    public GravitySpace(Bundle bundle)
+    {
         this.viewPosition = new Vector2d(bundle.getDouble("viewX"), bundle.getDouble("viewY"));
         this.objects = new ArrayList<>(Arrays.asList((GravitationalObject[]) bundle.getParcelableArray("objects")));
         this.zoomLevel = bundle.getDouble("zoom");
     }
 
-    public GravitySpace() {
+    public GravitySpace()
+    {
 
     }
 
-    public void draw(Canvas canvas) {
+    public void draw(Canvas canvas)
+    {
+        int width = canvas.getWidth();
+        int height = canvas.getHeight();
+
         double enlargement = this.getEnlargement();
+
+        double lineDistance = 1024 * Math.exp(((int)(-this.zoomLevel) / 4) * 4);
+        Vector2d spaceViewStart = this.getSpaceLocation(new Vector2d(0, 0), width, height);
+        Vector2d spaceViewEnd = this.getSpaceLocation(new Vector2d(width, height), width, height);
+
         Paint p = new Paint();
-        for (int i = 0; i < this.objects.size(); i++) {
+        p.setStrokeWidth(5);
+        p.setColor(Color.rgb(255, 255, 255));
+
+        for (double i = Math.floor(spaceViewStart.x / lineDistance) * lineDistance; i <= spaceViewEnd.x; i += lineDistance)
+        {
+            Vector2d startViewLocation = this.getViewLocation(new Vector2d(i, spaceViewStart.y), width, height);
+            Vector2d endViewLocation = this.getViewLocation(new Vector2d(i, spaceViewEnd.y), width, height);
+            canvas.drawLine((float)startViewLocation.x, (float)startViewLocation.y, (float)startViewLocation.x, (float)endViewLocation.y, p);
+        }
+
+        for (double i = Math.floor(spaceViewStart.y / lineDistance) * lineDistance; i <= spaceViewEnd.y; i += lineDistance)
+        {
+            Vector2d startViewLocation = this.getViewLocation(new Vector2d(spaceViewStart.x, i), width, height);
+            Vector2d endViewLocation = this.getViewLocation(new Vector2d(spaceViewEnd.x, i), width, height);
+            canvas.drawLine((float)startViewLocation.x, (float)startViewLocation.y, (float)endViewLocation.x, (float)startViewLocation.y, p);
+        }
+
+        for (int i = 0; i < this.objects.size(); i++)
+        {
             GravitationalObject currentObject = this.objects.get(i);
-            Vector2d realCenterVector = this.getViewLocation(currentObject.position, canvas.getWidth(), canvas.getHeight());
+            Vector2d realCenterVector = this.getViewLocation(currentObject.position, width, height);
             double objectRealSize = currentObject.radius * enlargement;
             Rect enclosingRect = new Rect((int) (realCenterVector.x - objectRealSize), (int) (realCenterVector.y - objectRealSize), (int) (realCenterVector.x + objectRealSize), (int) (realCenterVector.y + objectRealSize));
-            if (enclosingRect.intersect(0, 0, canvas.getWidth(), canvas.getHeight())) {
+            if (enclosingRect.intersect(0, 0, canvas.getWidth(), canvas.getHeight()))
+            {
                 p.setColor(currentObject.getColor());
                 canvas.drawCircle((float) realCenterVector.x, (float) realCenterVector.y, (float) objectRealSize, p);
             }
         }
     }
 
-    public void drawSpecific(Canvas canvas, GravitationalObject object, int centerColor, boolean withVelocity) {
+    public void drawSpecific(Canvas canvas, GravitationalObject object, int centerColor, boolean withVelocity)
+    {
         double enlargement = this.getEnlargement();
         Paint p = new Paint();
         Vector2d realCenterVector = this.getViewLocation(object.position, canvas.getWidth(), canvas.getHeight());
         double objectRealSize = object.radius * enlargement;
         Rect enclosingRect = new Rect((int) (realCenterVector.x - objectRealSize), (int) (realCenterVector.y - objectRealSize), (int) (realCenterVector.x + objectRealSize), (int) (realCenterVector.y + objectRealSize));
-        if (enclosingRect.intersect(0, 0, canvas.getWidth(), canvas.getHeight())) {
+        if (enclosingRect.intersect(0, 0, canvas.getWidth(), canvas.getHeight()))
+        {
             p.setColor(object.getColor());
             canvas.drawCircle((float) realCenterVector.x, (float) realCenterVector.y, (float) objectRealSize, p);
-            if (centerColor != 0) {
+            if (centerColor != 0)
+            {
                 p.setColor(centerColor);
                 canvas.drawCircle((float) realCenterVector.x, (float) realCenterVector.y, (float) objectRealSize / 2, p);
             }
         }
-        if (withVelocity) {
+        if (withVelocity)
+        {
             p.setColor(Color.RED);
             this.drawVelocity(canvas, p, realCenterVector, object.velocity.multiply(enlargement));
         }
@@ -121,8 +186,10 @@ public class GravitySpace {
     /*
      * Draws an arrow from the center of the passed GravitationalObject pointing in the direction of the velocity of the object.
      */
-    private void drawVelocity(Canvas canvas, Paint p, Vector2d position, Vector2d velocity) {
-        if (velocity.x != 0 || velocity.y != 0) {
+    private void drawVelocity(Canvas canvas, Paint p, Vector2d position, Vector2d velocity)
+    {
+        if (velocity.x != 0 || velocity.y != 0)
+        {
             canvas.save();
             float totalSpeed = (float) velocity.getLength() * 32;
             canvas.translate((float) position.x, (float) position.y);
@@ -140,30 +207,36 @@ public class GravitySpace {
         }
     }
 
-    public void addObject(GravitationalObject object) {
+    public void addObject(GravitationalObject object)
+    {
         this.objects.add(object);
     }
 
-    public GravitationalObject getObject(int index) {
+    public GravitationalObject getObject(int index)
+    {
         return this.objects.get(index);
     }
 
-    public int getNumberOfObjects() {
+    public int getNumberOfObjects()
+    {
         return this.objects.size();
     }
 
-    public void removeObject(int index) {
+    public void removeObject(int index)
+    {
         this.objects.remove(index);
     }
 
     /*
      * @return The vector in the gravitational space that corresponds to the passed onViewLocation vector in the view.
      */
-    public Vector2d getSpaceLocation(Vector2d onViewLocation, int viewWidth, int viewHeight) {
+    public Vector2d getSpaceLocation(Vector2d onViewLocation, int viewWidth, int viewHeight)
+    {
         return this.viewPosition.add(onViewLocation.subtract(new Vector2d(viewWidth, viewHeight).multiply(1 / (double) 2)).multiply(1 / this.getEnlargement()));
     }
 
-    private Vector2d getViewLocation(Vector2d onSpaceLocation, int viewWidth, int viewHeight) {
+    private Vector2d getViewLocation(Vector2d onSpaceLocation, int viewWidth, int viewHeight)
+    {
         return onSpaceLocation.subtract(this.viewPosition).multiply(this.getEnlargement()).add(new Vector2d(viewWidth / 2, viewHeight / 2));
     }
 
@@ -171,61 +244,77 @@ public class GravitySpace {
      * @param spaceLocation The vector to find.
      * @return The index of the GravitationalObject that contains the passed spaceLocation. If no object contains this location -1 is returned.
      */
-    public int isContainedIn(Vector2d spaceLocation) {
-        for (int i = 0; i < this.objects.size(); i++) {
+    public int isContainedIn(Vector2d spaceLocation)
+    {
+        for (int i = 0; i < this.objects.size(); i++)
+        {
             GravitationalObject currentObject = this.objects.get(i);
-            if (currentObject.position.subtract(spaceLocation).selfDot() <= Math.pow(currentObject.radius, 2)) {
+            if (currentObject.position.subtract(spaceLocation).selfDot() <= Math.pow(currentObject.radius, 2))
+            {
                 return i;
             }
         }
         return -1;
     }
 
-    public double getEnlargement() {
+    public double getEnlargement()
+    {
         return Math.exp(this.zoomLevel);
     }
 
-    public void drawObjectVelocity(Canvas canvas, int index) {
+    public void drawObjectVelocity(Canvas canvas, int index)
+    {
         this.drawObjectVelocity(canvas, this.objects.get(index));
     }
 
-    public void drawObjectVelocity(Canvas canvas, GravitationalObject object) {
+    public void drawObjectVelocity(Canvas canvas, GravitationalObject object)
+    {
         Paint p = new Paint();
         p.setColor(Color.RED);
         this.drawVelocity(canvas, p, this.getViewLocation(object.position, canvas.getWidth(), canvas.getHeight()), object.velocity.multiply(this.getEnlargement()));
     }
 
-    public boolean doesCollide(GravitationalObject object) {
-        for (int i = 0; i < this.objects.size(); i++) {
-            if (this.objects.get(i).doesCollide(object)) {
+    public boolean doesCollide(GravitationalObject object)
+    {
+        for (int i = 0; i < this.objects.size(); i++)
+        {
+            if (this.objects.get(i).doesCollide(object))
+            {
                 return true;
             }
         }
         return false;
     }
 
-    public void scale(double scaleFactor, Vector2d focusPoint) {
+    public void scale(double scaleFactor, Vector2d focusPoint)
+    {
         this.viewPosition = focusPoint.multiply(1 - 1 / scaleFactor).add(this.viewPosition.multiply(1 / scaleFactor));
         this.zoomLevel += Math.log(scaleFactor);
     }
 
-    public void moveView(Vector2d positionChange) {
+    public void moveView(Vector2d positionChange)
+    {
         this.viewPosition = this.viewPosition.add(positionChange);
     }
 
-    public Vector2d getViewPosition() {
+    public Vector2d getViewPosition()
+    {
         return this.viewPosition;
     }
 
-    public void goToTheNearestObject() {
-        if (objects.size() == 0) {
+    public void goToTheNearestObject()
+    {
+        if (objects.size() == 0)
+        {
             return;
         }
         double leastDistance = (this.viewPosition.subtract(objects.get(0).position)).selfDot();
         int leastDistanceIndex = 0;
-        for (int i = 1; i < objects.size(); i++) {
+        for (int i = 1; i < objects.size(); i++)
+        {
             double distance = (this.viewPosition.subtract(objects.get(i).position)).selfDot();
-            if (distance < leastDistance) {
+            if (distance < leastDistance)
+            {
                 leastDistance = distance;
                 leastDistanceIndex = i;
             }
