@@ -1,6 +1,7 @@
 package com.github.mimo31.gravitysimulator;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -50,15 +51,54 @@ public class MainActivity extends Activity implements Runnable
     protected void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
+
+        // create the GravityView
         if (savedInstanceState != null)
         {
             this.gravityView = new GravityView(this, savedInstanceState.getBundle("GravityView"));
+            this.gravityView.setVisibility(View.GONE);
         }
         else
         {
             this.gravityView = new GravityView(this);
         }
         this.addContentView(this.gravityView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        //int width = getWidth();
+        //int height = getHeight();
+
+        // create the PauseView
+        this.pauseView = new PauseMenuView(this);
+        this.addContentView(this.pauseView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        this.pauseView.setVisibility(View.GONE);
+
+        // create the HelpView
+        this.helpView = this.getLayoutInflater().inflate(R.layout.help_layout, null);
+        this.addContentView(this.helpView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        this.helpView.setVisibility(View.GONE);
+
+        // create the AddObjectView
+        this.addObjectView = this.getLayoutInflater().inflate(R.layout.add_object_layout, null);
+        this.addContentView(this.addObjectView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        this.addObjectView.setVisibility(View.GONE);
+
+        // create the SettingsView
+        this.settingsView = this.getLayoutInflater().inflate(R.layout.settings_layout, null);
+        this.addContentView(this.settingsView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        CheckBox gridCheckBox = (CheckBox) this.findViewById(R.id.settingsGridCheckBox);
+        CheckBox followCheckBox = (CheckBox) this.findViewById(R.id.settingsFollowCheckBox);
+
+        // set listeners to checked changes on the CheckBoxes
+        SettingsChangeListener listener = new SettingsChangeListener(this);
+        gridCheckBox.setOnCheckedChangeListener(listener);
+        followCheckBox.setOnCheckedChangeListener(listener);
+
+        // set the check states of the CheckBoxes based on the GravityView variables
+        gridCheckBox.setChecked(this.gravityView.showLineGrid);
+        followCheckBox.setChecked(this.gravityView.followObjects);
+        this.settingsView.setVisibility(View.GONE);
+
         this.updateHandler.postDelayed(this, updateDelay);
     }
 
@@ -182,13 +222,6 @@ public class MainActivity extends Activity implements Runnable
     {
         this.state = ViewState.ANIM_PAUSE_TO_ADD_OBJECT;
 
-        // create the AddObjectView if it hasn't been yet created
-        if (this.addObjectView == null)
-        {
-            this.addObjectView = this.getLayoutInflater().inflate(R.layout.add_object_layout, null);
-            this.addContentView(this.addObjectView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        }
-
         int height = this.getHeight();
 
         // set the correct initial position of the AddObjectView
@@ -207,7 +240,7 @@ public class MainActivity extends Activity implements Runnable
      */
     private void showSoftKeyboard()
     {
-        InputMethodManager inputMethodManager = (InputMethodManager) getSystemService(this.getApplicationContext().INPUT_METHOD_SERVICE);
+        InputMethodManager inputMethodManager = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         inputMethodManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
     }
 
@@ -225,19 +258,13 @@ public class MainActivity extends Activity implements Runnable
      */
     private void showHelp()
     {
-        // create the HelpView if it hasn't been yet created
-        if (this.helpView == null)
-        {
-            this.helpView = this.getLayoutInflater().inflate(R.layout.help_layout, null);
-            this.addContentView(this.helpView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        }
-
         // construct the animation of popping up from the middle of the screen
         ScaleAnimation scaleAnimation = new ScaleAnimation(0, 1, 0, 1, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
         scaleAnimation.setDuration(200);
         scaleAnimation.setAnimationListener(new ShowHelpListener(this));
 
         // start the animation
+        this.helpView.setVisibility(View.VISIBLE);
         this.helpView.startAnimation(scaleAnimation);
     }
 
@@ -246,7 +273,7 @@ public class MainActivity extends Activity implements Runnable
 
         final MainActivity attachedTo;
 
-        public ShowHelpListener(MainActivity attachedTo)
+        private ShowHelpListener(MainActivity attachedTo)
         {
             this.attachedTo = attachedTo;
         }
@@ -254,8 +281,7 @@ public class MainActivity extends Activity implements Runnable
         @Override
         public void onAnimationStart(Animation animation)
         {
-            this.attachedTo.state = ViewState.GENERIC_ANIM;
-            this.attachedTo.helpView.setVisibility(View.VISIBLE);
+            this.attachedTo.state = ViewState.ANIM_HELP;
         }
 
         @Override
@@ -274,7 +300,7 @@ public class MainActivity extends Activity implements Runnable
 
     /**
      * Starts the animation of disappearing in the middle of the screen.
-     * @param v the View that has caused the called (the button)
+     * @param v the View that has caused the called (the button) - completely ignored
      */
     public void hideHelp(View v)
     {
@@ -292,7 +318,7 @@ public class MainActivity extends Activity implements Runnable
 
         final MainActivity attachedTo;
 
-        public HideHelpListener(MainActivity attachedTo)
+        private HideHelpListener(MainActivity attachedTo)
         {
             this.attachedTo = attachedTo;
         }
@@ -300,7 +326,7 @@ public class MainActivity extends Activity implements Runnable
         @Override
         public void onAnimationStart(Animation animation)
         {
-            this.attachedTo.state = ViewState.GENERIC_ANIM;
+            this.attachedTo.state = ViewState.ANIM_HELP;
             this.attachedTo.pauseView.setVisibility(View.VISIBLE);
         }
 
@@ -321,16 +347,10 @@ public class MainActivity extends Activity implements Runnable
     /**
      * Check that the parameters entered for the new object are valid.
      * If they are, starts the animation to the GravityView where the position and velocity are set.
-     * @param v the View that has caused the call (the button)
+     * @param v the View that has caused the call (the button) - completely ignored
      */
     public void confirmObjectAddition(View v)
     {
-        // make sure the call is from the proper button
-        if (v.getId() != R.id.addConfirmButton)
-        {
-            return;
-        }
-
         // make sure the user entered the radius
         String enteredRadiusText = ((TextView) this.findViewById(R.id.radiusText)).getText().toString();
         if (enteredRadiusText.equals(""))
@@ -391,7 +411,22 @@ public class MainActivity extends Activity implements Runnable
     protected void onSaveInstanceState(Bundle outState)
     {
         super.onSaveInstanceState(outState);
+
         outState.putBundle("GravityView", this.gravityView.putToBundle());
+
+        outState.putSerializable("ViewState", this.state);
+
+        // save the data from the AddObjectView
+        TextView radiusText = (TextView) this.addObjectView.findViewById(R.id.radiusText);
+        TextView densityText = (TextView) this.addObjectView.findViewById(R.id.densityText);
+        outState.putString("AddObjectView-Radius", radiusText.getText().toString());
+        outState.putString("AddObjectView-Density", densityText.getText().toString());
+
+        // save data about the adding object
+        if (this.state == ViewState.ADDING_OBJECT)
+        {
+            outState.putParcelable("AddingObject", this.addingObject);
+        }
     }
 
     @Override
@@ -413,37 +448,85 @@ public class MainActivity extends Activity implements Runnable
     protected void onRestoreInstanceState(Bundle savedInstanceState)
     {
         super.onRestoreInstanceState(savedInstanceState);
-        boolean isNull = this.gravityView == null;
-        if (isNull)
+
+        // load the state
+        this.state = (ViewState)savedInstanceState.getSerializable("ViewState");
+
+        // make the proper views visible
+        switch (this.state)
         {
-            if (savedInstanceState != null)
-            {
-                this.gravityView = new GravityView(this, savedInstanceState.getBundle("GravityView"));
-            }
-            else
-            {
-                this.gravityView = new GravityView(this);
-            }
-            this.addContentView(this.gravityView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-            this.updateHandler.postDelayed(this, updateDelay);
+            case SIMULATION:
+                this.gravityView.setVisibility(View.VISIBLE);
+                break;
+            case PAUSE_VIEW:
+                this.pauseView.setVisibility(View.VISIBLE);
+                break;
+            case HELP_VIEW:
+                this.helpView.setVisibility(View.VISIBLE);
+                break;
+            case SETTINGS_VIEW:
+                this.settingsView.setVisibility(View.VISIBLE);
+                break;
+            case ADD_OBJECT_VIEW:
+                this.addObjectView.setVisibility(View.VISIBLE);
+                break;
+            case ADDING_OBJECT:
+                this.gravityView.setVisibility(View.VISIBLE);
+                break;
+            case ANIM_PAUSING:
+            case ANIM_RESUMING:
+                this.gravityView.setVisibility(View.VISIBLE);
+                this.pauseView.setVisibility(View.VISIBLE);
+                break;
+            case ANIM_HELP:
+                this.pauseView.setVisibility(View.VISIBLE);
+                this.helpView.setVisibility(View.VISIBLE);
+                break;
+            case ANIM_SETTINGS:
+                this.pauseView.setVisibility(View.VISIBLE);
+                this.settingsView.setVisibility(View.VISIBLE);
+                break;
+            case ANIM_ADD_OBJECT_TO_GRAVITY:
+            case ANIM_ADD_OBJECT_CANCEL:
+                this.addObjectView.setVisibility(View.VISIBLE);
+                this.gravityView.setVisibility(View.VISIBLE);
+                break;
+            case ANIM_ADD_OBJECT_TO_PAUSE:
+            case ANIM_PAUSE_TO_ADD_OBJECT:
+                this.addObjectView.setVisibility(View.VISIBLE);
+                this.pauseView.setVisibility(View.VISIBLE);
+                break;
+        }
+
+        // load the data in AddObjectView
+        TextView radiusText = (TextView) this.addObjectView.findViewById(R.id.radiusText);
+        TextView densityText = (TextView) this.addObjectView.findViewById(R.id.densityText);
+        radiusText.setText(savedInstanceState.getString("AddObjectView-Radius"));
+        densityText.setText(savedInstanceState.getString("AddObjectView-Density"));
+
+        // load the adding object
+        if (savedInstanceState.containsKey("AddingObject"))
+        {
+            this.addingObject = savedInstanceState.getParcelable("AddingObject");
         }
     }
 
+    /**
+     * Starts the animation of hiding the AddObjectView and showing the PauseView.
+     * @param v the view that caused the call (if not caused by a view, should be null) - completely ignored
+     */
     public void cancelObjectAddition(View v)
     {
-        if (v.getId() == R.id.addCancelButton)
-        {
-            this.state = ViewState.ANIM_ADD_OBJECT_TO_PAUSE;
+        this.state = ViewState.ANIM_ADD_OBJECT_TO_PAUSE;
 
-            int height = this.getHeight();
+        int height = this.getHeight();
 
-            // set correct initial position for the PauseView
-            this.pauseView.setX(0);
-            this.pauseView.setY(height);
+        // set correct initial position for the PauseView
+        this.pauseView.setX(0);
+        this.pauseView.setY(height);
 
-            // show the PauseView
-            this.pauseView.setVisibility(View.VISIBLE);
-        }
+        // show the PauseView
+        this.pauseView.setVisibility(View.VISIBLE);
     }
 
     /**
@@ -454,14 +537,6 @@ public class MainActivity extends Activity implements Runnable
         this.state = ViewState.ANIM_PAUSING;
 
         int width = this.getWidth();
-        int height = this.getHeight();
-
-        // create the PauseView if it hasn't been yet created.
-        if (this.pauseView == null)
-        {
-            this.pauseView = new PauseMenuView(this);
-            this.addContentView(this.pauseView, new ViewGroup.LayoutParams(width, height));
-        }
 
         // set the correct initial position for PauseView
         this.pauseView.setX(-width);
@@ -469,6 +544,7 @@ public class MainActivity extends Activity implements Runnable
 
         // show the PauseView
         this.pauseView.setVisibility(View.VISIBLE);
+        this.pauseView.postInvalidate();
     }
 
     /**
@@ -586,7 +662,7 @@ public class MainActivity extends Activity implements Runnable
 
             private final PauseMenuView attachedTo;
 
-            public GestureListener(PauseMenuView attachedTo)
+            private GestureListener(PauseMenuView attachedTo)
             {
                 this.attachedTo = attachedTo;
             }
@@ -678,24 +754,13 @@ public class MainActivity extends Activity implements Runnable
      */
     private void showSettings()
     {
-        // create the HelpView if it hasn't been yet created
-        if (this.settingsView == null)
-        {
-            this.settingsView = this.getLayoutInflater().inflate(R.layout.settings_layout, null);
-            this.addContentView(this.settingsView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-            // set listeners to checked changes on the CheckBoxes
-            SettingsChangeListener listener = new SettingsChangeListener(this);
-            ((CheckBox) this.findViewById(R.id.settingsGridCheckBox)).setOnCheckedChangeListener(listener);
-            ((CheckBox) this.findViewById(R.id.settingsFollowCheckBox)).setOnCheckedChangeListener(listener);
-        }
-
         // construct the animation of popping up from the middle of the screen
         ScaleAnimation scaleAnimation = new ScaleAnimation(0, 1, 0, 1, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
         scaleAnimation.setDuration(200);
         scaleAnimation.setAnimationListener(new ShowSettingsListener(this));
 
         // start the animation
+        this.settingsView.setVisibility(View.VISIBLE);
         this.settingsView.startAnimation(scaleAnimation);
     }
 
@@ -704,7 +769,7 @@ public class MainActivity extends Activity implements Runnable
 
         final MainActivity attachedTo;
 
-        public ShowSettingsListener(MainActivity attachedTo)
+        private ShowSettingsListener(MainActivity attachedTo)
         {
             this.attachedTo = attachedTo;
         }
@@ -712,8 +777,7 @@ public class MainActivity extends Activity implements Runnable
         @Override
         public void onAnimationStart(Animation animation)
         {
-            this.attachedTo.state = ViewState.GENERIC_ANIM;
-            this.attachedTo.settingsView.setVisibility(View.VISIBLE);
+            this.attachedTo.state = ViewState.ANIM_SETTINGS;
         }
 
         @Override
@@ -732,7 +796,7 @@ public class MainActivity extends Activity implements Runnable
 
     /**
      * Starts the animation of disappearing in the middle of the screen.
-     * @param v the View that has caused the called (the button)
+     * @param v the View that has caused the called (the button) - completely ignored
      */
     public void hideSettings(View v)
     {
@@ -750,7 +814,7 @@ public class MainActivity extends Activity implements Runnable
 
         final MainActivity attachedTo;
 
-        public HideSettingsListener(MainActivity attachedTo)
+        private HideSettingsListener(MainActivity attachedTo)
         {
             this.attachedTo = attachedTo;
         }
@@ -758,7 +822,7 @@ public class MainActivity extends Activity implements Runnable
         @Override
         public void onAnimationStart(Animation animation)
         {
-            this.attachedTo.state = ViewState.GENERIC_ANIM;
+            this.attachedTo.state = ViewState.ANIM_SETTINGS;
             this.attachedTo.pauseView.setVisibility(View.VISIBLE);
         }
 
@@ -773,6 +837,34 @@ public class MainActivity extends Activity implements Runnable
         {
             this.attachedTo.state = ViewState.PAUSE_VIEW;
             this.attachedTo.settingsView.setVisibility(View.GONE);
+        }
+    }
+
+    @Override
+    public void onBackPressed()
+    {
+        if (this.state == ViewState.PAUSE_VIEW)
+        {
+            this.resume();
+        }
+        else if (this.state == ViewState.HELP_VIEW)
+        {
+            this.hideHelp(null);
+        }
+        else if (this.state == ViewState.SETTINGS_VIEW)
+        {
+            this.hideSettings(null);
+        }
+        else if (this.state == ViewState.ADD_OBJECT_VIEW)
+        {
+            this.cancelObjectAddition(null);
+        }
+        else if (this.state == ViewState.ADDING_OBJECT || this.state == ViewState.SIMULATION)
+        {
+            if (this.gravityView.resolveBackPressed())
+            {
+                super.onBackPressed();
+            }
         }
     }
 }

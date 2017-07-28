@@ -16,7 +16,7 @@ import java.util.List;
  * <p/>
  * An class to handle object object gravity physics and displaying.
  */
-public class GravitySpace
+class GravitySpace
 {
 
     private List<GravitationalObject> objects = new ArrayList<>();
@@ -25,7 +25,7 @@ public class GravitySpace
     /*
      * Represents the level of the zoom of the map. That is the natural logarithm of the actual enlargement.
      */
-    double zoomLevel = 0;
+    private double zoomLevel = 0;
 
     /*
     * Moves the objects according to the laws of gravity.
@@ -82,6 +82,14 @@ public class GravitySpace
 
     void updateViewVelocity()
     {
+        if (this.objects.size() == 0)
+        {
+            if (this.viewVelocity.x != 0 || this.viewVelocity.y != 0)
+            {
+                this.viewVelocity = new Vector2d(0, 0);
+            }
+            return;
+        }
         Vector2d momentum = new Vector2d(0, 0);
         double mass = 0;
         for (int i = 0, n = this.objects.size(); i < n; i++)

@@ -82,6 +82,13 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         this(attachedTo);
         this.space = new GravitySpace(bundle.getBundle("space"));
         this.paused = bundle.getBoolean("paused");
+        this.followObjects = bundle.getBoolean("followObjects");
+        this.showLineGrid = bundle.getBoolean("showLineGrid");
+        this.changingVelocity = bundle.getBoolean("changingVelocity");
+        this.lastObjectInfoShown = bundle.getParcelable("lastObjectInfoShown");
+        this.objectInfoState = bundle.getFloat("objectInfoState");
+        this.objectInfoIndex = bundle.getInt("objectInfoIndex");
+        this.positionConfirmed = bundle.getBoolean("positionConfirmed");
     }
 
     @Override
@@ -209,7 +216,7 @@ public class GravityView extends View implements DialogInterface.OnClickListener
     /**
      * Updates the variable isAddingObjectValid to whether the adding object collides with some another object in GravitySpace.
      */
-    void validateAddingObject()
+    private void validateAddingObject()
     {
         this.isAddingObjectValid = !this.space.doesCollide(this.attachedTo.addingObject);
     }
@@ -371,6 +378,13 @@ public class GravityView extends View implements DialogInterface.OnClickListener
         Bundle bundle = new Bundle();
         bundle.putBundle("space", this.space.putToBundle());
         bundle.putBoolean("paused", this.paused);
+        bundle.putBoolean("followObjects", this.followObjects);
+        bundle.putBoolean("showLineGrid", this.showLineGrid);
+        bundle.putBoolean("changingVelocity", this.changingVelocity);
+        bundle.putParcelable("lastObjectInfoShown", this.lastObjectInfoShown);
+        bundle.putFloat("objectInfoState", this.objectInfoState);
+        bundle.putInt("objectInfoIndex", this.objectInfoIndex);
+        bundle.putBoolean("positionConfirmed", this.positionConfirmed);
         return bundle;
     }
 
@@ -379,7 +393,7 @@ public class GravityView extends View implements DialogInterface.OnClickListener
 
         private final GravityView attachedTo;
 
-        public ScaleListener(GravityView attachedTo)
+        private ScaleListener(GravityView attachedTo)
         {
             this.attachedTo = attachedTo;
         }
@@ -400,7 +414,7 @@ public class GravityView extends View implements DialogInterface.OnClickListener
 
         private final GravityView attachedTo;
 
-        public GestureListener(GravityView attachedTo)
+        private GestureListener(GravityView attachedTo)
         {
             this.attachedTo = attachedTo;
         }
@@ -505,7 +519,7 @@ public class GravityView extends View implements DialogInterface.OnClickListener
                     // vector from the adding object to the tap location
                     Vector2d distanceVector = spaceClickLocation.subtract(activity.addingObject.position);
 
-                    // shrink the vector by 1 / 32 and set it as the veloctity
+                    // shrink the vector by 1 / 32 and set it as the velocity
                     activity.addingObject.velocity = distanceVector.multiply(1 / (double) 32);
                 }
                 // now position will be set
@@ -620,5 +634,47 @@ public class GravityView extends View implements DialogInterface.OnClickListener
             this.attachedTo.space.goToTheNearestObject();
             this.attachedTo.postInvalidate();
         }
+    }
+
+    /**
+     * Handles the press of the back button when the ViewState is ADDING_OBJECT or SIMULATION.
+     * @return whether the default action (which would probably mean closing the Activity) should be also executed
+     */
+    boolean resolveBackPressed()
+    {
+        if (this.attachedTo.state == ViewState.ADDING_OBJECT)
+        {
+            if (this.positionConfirmed)
+            {
+                // unconfirm position
+                this.positionConfirmed = false;
+                this.postInvalidate();
+            }
+            else
+            {
+                // cancel object addition - go back to the AddObjectView
+                this.attachedTo.cancelObjectAddFromGravity();
+            }
+            return false;
+        }
+        else if (this.attachedTo.state == ViewState.SIMULATION)
+        {
+            if (this.changingVelocity)
+            {
+                // stop changing velocity
+                this.changingVelocity = false;
+                this.space.updateViewVelocity();
+                return false;
+            }
+            if (this.objectInfoIndex != -1)
+            {
+                // hide the object info panel
+                this.objectInfoIndex = -1;
+                this.lastObjectInfoShown = this.space.getObject(this.objectInfoIndex);
+                return false;
+            }
+            return true;
+        }
+        return false;
     }
 }
